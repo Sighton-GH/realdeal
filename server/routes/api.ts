@@ -275,7 +275,8 @@ apiRoute.post("/scrape", (c) => {
   const adminToken = process.env.ADMIN_TOKEN;
   const clientToken = c.req.header("x-admin-token");
 
-  if (!adminToken || clientToken !== adminToken) {
+  // The .env.example placeholder counts as "not configured" so a copied .env can't leave this open
+  if (!adminToken || adminToken === "change-me" || clientToken !== adminToken) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 

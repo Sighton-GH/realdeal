@@ -52,9 +52,10 @@ export function setupStatic(app: Hono): void {
     const reqPath = c.req.path;
     const sanitized = path.normalize(reqPath).replace(/^(\.\.[/\\])+/, "");
     const targetFile = path.join(DIST_DIR, sanitized);
+    const insideDist = targetFile === DIST_DIR || targetFile.startsWith(DIST_DIR + path.sep);
 
     try {
-      if (fs.existsSync(targetFile) && fs.statSync(targetFile).isFile()) {
+      if (insideDist && fs.existsSync(targetFile) && fs.statSync(targetFile).isFile()) {
         const ext = path.extname(targetFile).toLowerCase();
         const mimeType = MIME_TYPES[ext] ?? "application/octet-stream";
 
@@ -69,6 +70,11 @@ export function setupStatic(app: Hono): void {
       }
     } catch {
       // Fall through to index.html fallback
+    }
+
+    // A missing file (anything with an extension, and all of /assets) is a 404, not the app shell
+    if (reqPath.startsWith("/assets/") || path.extname(reqPath) !== "") {
+      return c.text("Not found", 404);
     }
 
     // SPA fallback to dist/index.html
