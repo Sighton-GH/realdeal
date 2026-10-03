@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+data/*
+!data/README.md
+screenshots
+*.log
+.DS_Store

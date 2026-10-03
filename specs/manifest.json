@@ -1,0 +1,720 @@
+{
+  "tasks": [
+    {
+      "id": "UI-01",
+      "title": "Buttons: Button, LinkButton, IconButton",
+      "owns": [
+        "src/components/ui/Button.tsx",
+        "src/components/ui/LinkButton.tsx",
+        "src/components/ui/IconButton.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Gemini / Claude",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "UI-02",
+      "title": "Surfaces: Card, Chip, VerdictBadge, Section",
+      "owns": [
+        "src/components/ui/Card.tsx",
+        "src/components/ui/Chip.tsx",
+        "src/components/ui/VerdictBadge.tsx",
+        "src/components/ui/Section.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "UI-03",
+      "title": "Display: ProgressBar, PriceText, Skeleton",
+      "owns": [
+        "src/components/ui/ProgressBar.tsx",
+        "src/components/ui/PriceText.tsx",
+        "src/components/ui/Skeleton.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "UI-04",
+      "title": "Inputs: TextField, SearchField, Stepper, Toggle",
+      "owns": [
+        "src/components/ui/TextField.tsx",
+        "src/components/ui/SearchField.tsx",
+        "src/components/ui/Stepper.tsx",
+        "src/components/ui/Toggle.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "UI-05",
+      "title": "Overlays: Sheet, Toast",
+      "owns": [
+        "src/components/ui/Sheet.tsx",
+        "src/components/ui/Toast.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Gemini / Claude",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "UI-06",
+      "title": "Expressive: SpeechBubble, StoreTile, EmptyState",
+      "owns": [
+        "src/components/ui/SpeechBubble.tsx",
+        "src/components/ui/StoreTile.tsx",
+        "src/components/ui/EmptyState.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Gemini / Claude",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "UI-07",
+      "title": "App shell: AppShell, AppColumn, TopBar, BottomNav, pattern",
+      "owns": [
+        "src/components/layout/AppShell.tsx",
+        "src/components/layout/AppColumn.tsx",
+        "src/components/layout/TopBar.tsx",
+        "src/components/layout/BottomNav.tsx",
+        "public/pattern.svg"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Gemini / Claude",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "UI-08",
+      "title": "UI playground page (/dev/ui)",
+      "owns": [
+        "src/pages/dev/UiPlayground.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "any (GLM fine)",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "ART-01",
+      "title": "Penny mascot (9 animated moods) + PennyFace",
+      "owns": [
+        "src/components/penny/Penny.tsx",
+        "src/components/penny/PennyFace.tsx",
+        "src/components/penny/parts/**"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Claude (strongest at SVG)",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "ART-02",
+      "title": "Logo wordmark + favicon",
+      "owns": [
+        "src/components/penny/Logo.tsx",
+        "public/favicon.svg"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "ART-03",
+      "title": "Item illustrations: dairy and bakery (11)",
+      "owns": [
+        "src/components/art/items/dairyBakery.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Claude / Gemini",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "ART-04",
+      "title": "Item illustrations: pantry and produce (18)",
+      "owns": [
+        "src/components/art/items/pantryProduce.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Claude / Gemini",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "ART-05",
+      "title": "ItemArt wiring + Penny playground (/dev/penny)",
+      "owns": [
+        "src/components/art/ItemArt.tsx",
+        "src/pages/dev/PennyPlayground.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "DATA-01",
+      "title": "Catalogue: 40 items + 12 store branches",
+      "owns": [
+        "shared/seed/items.ts",
+        "shared/seed/locations.ts"
+      ],
+      "context": [
+        "CORE",
+        "BACKEND"
+      ],
+      "agent": "any with web access (for real branches)",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "DATA-02",
+      "title": "Seed price generator + hero stories",
+      "owns": [
+        "shared/seed/generate.ts",
+        "shared/seed/rng.ts",
+        "shared/seed/generate.test.ts"
+      ],
+      "context": [
+        "CORE",
+        "BACKEND"
+      ],
+      "agent": "GLM / Claude",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "DATA-03",
+      "title": "Verdict engine + tests",
+      "owns": [
+        "shared/verdict.ts",
+        "shared/engine/**",
+        "shared/verdict.test.ts"
+      ],
+      "context": [
+        "CORE",
+        "BACKEND"
+      ],
+      "agent": "Claude / GLM",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "DATA-04",
+      "title": "Featured deals, mock API, story tests",
+      "owns": [
+        "shared/seed/featured.ts",
+        "src/api/mock.ts",
+        "shared/stories.test.ts"
+      ],
+      "context": [
+        "CORE",
+        "BACKEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-01",
+      "title": "Landing hero demo + ShelfTag",
+      "owns": [
+        "src/pages/landing/HeroDemo.tsx",
+        "src/pages/landing/ShelfTag.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Claude / Gemini",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-02",
+      "title": "Landing page sections",
+      "owns": [
+        "src/pages/landing/LandingPage.tsx",
+        "src/pages/landing/VerdictBand.tsx",
+        "src/pages/landing/TricksRows.tsx",
+        "src/pages/landing/DataNote.tsx",
+        "src/pages/landing/LandingFooter.tsx",
+        "src/pages/landing/sections/**"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Gemini",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-03",
+      "title": "Check home screen",
+      "owns": [
+        "src/pages/check/CheckHomePage.tsx",
+        "src/pages/check/home/**"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Gemini",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-04",
+      "title": "ItemRow, FlyerDealCard, DataFreshness",
+      "owns": [
+        "src/components/domain/ItemRow.tsx",
+        "src/components/domain/FlyerDealCard.tsx",
+        "src/components/domain/DataFreshness.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-05",
+      "title": "Price entry flow (3 steps)",
+      "owns": [
+        "src/pages/check/PriceEntryPage.tsx",
+        "src/pages/check/entry/StepStore.tsx",
+        "src/pages/check/entry/StepPrice.tsx",
+        "src/pages/check/entry/StepExtras.tsx",
+        "src/pages/check/entry/entryState.ts",
+        "src/pages/check/entry/EntryHeader.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Gemini / Claude",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-06",
+      "title": "Price keypad",
+      "owns": [
+        "src/pages/check/entry/PriceKeypad.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-07",
+      "title": "Reveal sequence (the hero moment)",
+      "owns": [
+        "src/pages/reveal/RevealPage.tsx",
+        "src/pages/reveal/stage/**",
+        "src/pages/reveal/useRevealSequence.ts",
+        "src/pages/reveal/effects.ts"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Claude",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-08",
+      "title": "Reveal result panel",
+      "owns": [
+        "src/pages/reveal/RevealResult.tsx",
+        "src/pages/reveal/result/**"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Gemini / Claude",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-09",
+      "title": "PriceGauge + TrickCard",
+      "owns": [
+        "src/components/domain/PriceGauge.tsx",
+        "src/components/domain/TrickCard.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-10",
+      "title": "Item detail screen",
+      "owns": [
+        "src/pages/item/**"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Gemini",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-11",
+      "title": "Price history chart (d3 + SVG)",
+      "owns": [
+        "src/components/domain/PriceHistoryChart.tsx",
+        "src/components/domain/chart/**"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Claude / Gemini",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-12",
+      "title": "NearbyPrices + SaleStreak",
+      "owns": [
+        "src/components/domain/NearbyPrices.tsx",
+        "src/components/domain/SaleStreak.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-13",
+      "title": "Camera hook + frame capture",
+      "owns": [
+        "src/pages/scan/useCamera.ts",
+        "src/pages/scan/captureFrame.ts",
+        "src/pages/scan/captureFrame.test.ts"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Claude / GLM",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-14",
+      "title": "Scan screen (viewfinder, reading, failures)",
+      "owns": [
+        "src/pages/scan/ScanPage.tsx",
+        "src/pages/scan/Viewfinder.tsx",
+        "src/pages/scan/ReadingOverlay.tsx",
+        "src/pages/scan/FailurePanel.tsx",
+        "src/pages/scan/StoreHint.tsx",
+        "src/pages/scan/parts/**"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "Gemini / Claude",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-15",
+      "title": "Scan confirm sheet + sample tag images",
+      "owns": [
+        "src/pages/scan/ScanConfirmSheet.tsx",
+        "src/pages/scan/SampleSheet.tsx",
+        "public/samples/**"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-16",
+      "title": "Trick Files page + trick copy",
+      "owns": [
+        "shared/content/tricks.ts",
+        "src/pages/tricks/**"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "GLM / Gemini",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "SCR-17",
+      "title": "404 + error screen",
+      "owns": [
+        "src/pages/system/NotFoundPage.tsx",
+        "src/pages/system/ErrorScreen.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "BE-01",
+      "title": "Scraper toolkit: parse, match, polite HTTP, browser",
+      "owns": [
+        "scrapers/parse.ts",
+        "scrapers/match.ts",
+        "scrapers/http.ts",
+        "scrapers/browser.ts",
+        "scrapers/config.ts",
+        "scrapers/parse.test.ts",
+        "scrapers/match.test.ts"
+      ],
+      "context": [
+        "CORE",
+        "BACKEND"
+      ],
+      "agent": "Claude / GLM",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "BE-02",
+      "title": "Save-On-Foods adapter",
+      "owns": [
+        "scrapers/adapters/saveon.ts",
+        "scrapers/adapters/saveon.dev.ts",
+        "scrapers/notes/saveon.md"
+      ],
+      "context": [
+        "CORE",
+        "BACKEND"
+      ],
+      "agent": "repo agent with browser (Claude Code / Gemini CLI)",
+      "wave": 2,
+      "note": "needs live web + terminal"
+    },
+    {
+      "id": "BE-03",
+      "title": "No Frills adapter",
+      "owns": [
+        "scrapers/adapters/nofrills.ts",
+        "scrapers/adapters/nofrills.dev.ts",
+        "scrapers/notes/nofrills.md"
+      ],
+      "context": [
+        "CORE",
+        "BACKEND"
+      ],
+      "agent": "repo agent with browser",
+      "wave": 2,
+      "note": "needs live web + terminal"
+    },
+    {
+      "id": "BE-04",
+      "title": "Walmart adapter",
+      "owns": [
+        "scrapers/adapters/walmart.ts",
+        "scrapers/adapters/walmart.dev.ts",
+        "scrapers/notes/walmart.md"
+      ],
+      "context": [
+        "CORE",
+        "BACKEND"
+      ],
+      "agent": "repo agent with browser",
+      "wave": 2,
+      "note": "needs live web + terminal"
+    },
+    {
+      "id": "BE-05",
+      "title": "T&T adapter",
+      "owns": [
+        "scrapers/adapters/tnt.ts",
+        "scrapers/adapters/tnt.dev.ts",
+        "scrapers/notes/tnt.md"
+      ],
+      "context": [
+        "CORE",
+        "BACKEND"
+      ],
+      "agent": "repo agent with browser",
+      "wave": 2,
+      "note": "needs live web + terminal"
+    },
+    {
+      "id": "BE-06",
+      "title": "Scrape runner, Hammer import, data merge",
+      "owns": [
+        "scrapers/run.ts",
+        "scrapers/import-hammer.ts",
+        "scrapers/merge.ts",
+        "scrapers/lib/**"
+      ],
+      "context": [
+        "CORE",
+        "BACKEND"
+      ],
+      "agent": "GLM / Claude",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "BE-07",
+      "title": "Live server (Hono) + live API client",
+      "owns": [
+        "server/index.ts",
+        "server/data.ts",
+        "server/routes/api.ts",
+        "server/static.ts",
+        "server/README.md",
+        "src/api/live.ts"
+      ],
+      "context": [
+        "CORE",
+        "BACKEND"
+      ],
+      "agent": "GLM / Claude",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "BE-08",
+      "title": "Gemini price-tag reader",
+      "owns": [
+        "server/scan.ts",
+        "server/scan.test.ts"
+      ],
+      "context": [
+        "CORE",
+        "BACKEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "BE-09",
+      "title": "Tiger Data mirror (optional)",
+      "owns": [
+        "server/tiger.ts"
+      ],
+      "context": [
+        "CORE",
+        "BACKEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "BE-10",
+      "title": "Penny's voice (ElevenLabs) + SpeakButton",
+      "owns": [
+        "server/routes/speak.ts",
+        "src/components/domain/SpeakButton.tsx"
+      ],
+      "context": [
+        "CORE",
+        "FRONTEND",
+        "BACKEND"
+      ],
+      "agent": "any",
+      "wave": 1,
+      "note": ""
+    },
+    {
+      "id": "BE-11",
+      "title": "Sound effects generator (ElevenLabs)",
+      "owns": [
+        "scripts/gen-sfx.ts",
+        "public/sfx/**"
+      ],
+      "context": [
+        "CORE",
+        "BACKEND"
+      ],
+      "agent": "repo agent with API key",
+      "wave": 2,
+      "note": "needs terminal + ELEVENLABS_API_KEY"
+    }
+  ]
+}
