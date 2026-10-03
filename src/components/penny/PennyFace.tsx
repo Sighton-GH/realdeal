@@ -1,15 +1,25 @@
-// STUB (SPEC-00). ART-01 replaces; props are final.
+import { cn } from "@/lib/cn";
+import { Face } from "./parts/Face";
 import type { PennyMood } from "./types";
 
-export interface PennyFaceProps { mood?: PennyMood; size?: number; className?: string }
+export interface PennyFaceProps {
+  mood?: PennyMood;
+  size?: number;
+  className?: string;
+}
 
+/** Head only: the coin and face, cropped to the circle. Static, legible at 24 to 48px. */
 export function PennyFace({ mood = "idle", size = 32, className }: PennyFaceProps) {
   return (
-    <svg role="img" aria-label={`Penny looks ${mood}`} width={size} height={size} viewBox="0 0 32 32" className={className}>
-      <circle cx="16" cy="16" r="15" fill="#E0793C" />
-      <circle cx="12" cy="14" r="2.5" fill="#241B35" />
-      <circle cx="20" cy="14" r="2.5" fill="#241B35" />
-      <path d="M11 20q5 4 10 0" stroke="#241B35" strokeWidth="2" fill="none" strokeLinecap="round" />
+    <svg
+      viewBox="22 30 156 156"
+      width={size}
+      height={size}
+      role="img"
+      aria-label={`Penny looks ${mood}`}
+      className={cn("shrink-0", className)}
+    >
+      <Face mood={mood} still />
     </svg>
   );
 }
