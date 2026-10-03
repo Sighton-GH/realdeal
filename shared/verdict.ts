@@ -1,96 +1,102 @@
-// PLACEHOLDER engine (SPEC-00). DATA-03 replaces the bodies; keep every export name and signature.
+// Verdict engine (DATA-03). Pure TypeScript, shared by the browser (mock mode) and the server (live mode).
 import type {
-  Category, GeoPoint, Item, ItemDetail, MultiBuy, NearbyStorePrice, PriceCheckInput, PricePoint,
-  PriceStore, RetailerStats, Verdict, VerdictTier,
+  Category, GeoPoint, Item, ItemDetail, NearbyStorePrice, PriceCheckInput, PricePoint,
+  PriceStore, RetailerId, RetailerStats, Verdict,
 } from "./types";
-import { RETAILERS } from "./retailers";
+import { RETAILERS, retailerById } from "./retailers";
+import { detectTricks } from "./engine/tricks";
+import { distanceKm, mean, newCheckId, tierFor, unitPriceOf } from "./engine/util";
 
 export { DATA_END, WEEKS } from "./seed/constants";
 export { generateSeedStore } from "./seed/generate";
+export { unitPriceOf, tierFor, distanceKm };
 
-export function unitPriceOf(price: number, sizeQty: number, multiBuy?: MultiBuy): number {
-  const effective = multiBuy ? multiBuy.total / multiBuy.qty : price;
-  return effective / sizeQty;
-}
-
-export function tierFor(pct: number): VerdictTier {
-  if (pct <= -0.25) return "steal";
-  if (pct <= -0.1) return "good";
-  if (pct <= 0.1) return "normal";
-  return "high";
-}
-
-export function distanceKm(a: GeoPoint, b: GeoPoint): number {
-  const R = 6371;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
+const WINDOW_WEEKS = 13; // about 90 days
 
 export function mergeStores(base: PriceStore, overlays: PricePoint[][]): PriceStore {
   const key = (p: PricePoint) => `${p.itemId}|${p.retailerId}|${p.date}|${p.storeId ?? "chain"}`;
   const map = new Map(base.points.map((p) => [key(p), p]));
   for (const layer of overlays) for (const p of layer) map.set(key(p), p);
-  return { ...base, points: [...map.values()], generatedAt: new Date().toISOString() };
+  return { items: base.items, locations: base.locations, points: [...map.values()], generatedAt: new Date().toISOString() };
 }
 
+/** Chain-level points only (no storeId), oldest first. */
 function chainPoints(store: PriceStore, itemId: string): PricePoint[] {
-  return store.points.filter((p) => p.itemId === itemId && !p.storeId).sort((a, b) => a.date.localeCompare(b.date));
+  return store.points
+    .filter((p) => p.itemId === itemId && !p.storeId)
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
+
+const forRetailer = (pts: PricePoint[], id: RetailerId) => pts.filter((p) => p.retailerId === id);
 
 export function getItemDetail(store: PriceStore, itemId: string): ItemDetail {
   const item = store.items.find((i) => i.id === itemId);
   if (!item) throw new Error("Item not found");
   const history = chainPoints(store, itemId);
+  if (history.length === 0) throw new Error("No price data for item");
+
   const units: number[] = [];
-  const byRetailer: RetailerStats[] = RETAILERS.map((r) => {
-    const pts = history.filter((p) => p.retailerId === r.id);
-    pts.slice(-13).forEach((p) => units.push(unitPriceOf(p.price, p.sizeQty, p.multiBuy)));
+  const byRetailer: RetailerStats[] = [];
+  for (const r of RETAILERS) {
+    const pts = forRetailer(history, r.id);
+    if (pts.length === 0) continue;
+    for (const p of pts.slice(-WINDOW_WEEKS)) units.push(unitPriceOf(p.price, p.sizeQty, p.multiBuy));
     const last = pts[pts.length - 1];
-    const last12 = pts.slice(-12);
-    return {
+    byRetailer.push({
       retailerId: r.id,
       currentPrice: last.price,
       currentUnitPrice: unitPriceOf(last.price, last.sizeQty, last.multiBuy),
       onSale: last.onSale,
-      saleFreq12w: last12.filter((p) => p.onSale).length / 12,
+      saleFreq12w: pts.slice(-12).filter((p) => p.onSale).length / 12,
       currentSizeQty: last.sizeQty,
       lastSeen: last.date,
       live: last.source === "scrape",
-    };
-  });
-  const avg = units.reduce((a, b) => a + b, 0) / units.length;
-  return { item, history, stats: { avgUnit90: avg, lowUnit90: Math.min(...units), highUnit90: Math.max(...units), byRetailer } };
+    });
+  }
+  return {
+    item,
+    history,
+    stats: { avgUnit90: mean(units), lowUnit90: Math.min(...units), highUnit90: Math.max(...units), byRetailer },
+  };
 }
 
 export function checkPrice(store: PriceStore, input: PriceCheckInput, now: Date = new Date()): Verdict {
   const detail = getItemDetail(store, input.itemId);
-  const size = input.sizeQty ?? detail.item.sizeQty;
+  const { item, stats } = detail;
+  const mineHistory = forRetailer(detail.history, input.retailerId);
+  const mine = stats.byRetailer.find((r) => r.retailerId === input.retailerId);
+
+  const size = input.sizeQty ?? mine?.currentSizeQty ?? item.sizeQty;
   const unitPrice = unitPriceOf(input.price, size, input.multiBuy);
-  const avg = detail.stats.avgUnit90;
+  const avg = stats.avgUnit90;
   const pct = (unitPrice - avg) / avg;
-  const bestStats = [...detail.stats.byRetailer].sort((a, b) => a.currentUnitPrice - b.currentUnitPrice)[0];
-  const best = bestStats.currentUnitPrice < unitPrice
-    ? { retailerId: bestStats.retailerId, price: bestStats.currentPrice, unitPrice: bestStats.currentUnitPrice }
-    : { retailerId: input.retailerId, price: input.price, unitPrice };
-  const mine = detail.stats.byRetailer.find((r) => r.retailerId === input.retailerId);
+  const saleFreq12w = mine?.saleFreq12w ?? 0;
+
+  // Cheapest current price: every retailer's latest point, with the input store at the input price.
+  const candidates = stats.byRetailer
+    .filter((r) => r.retailerId !== input.retailerId)
+    .map((r) => ({ retailerId: r.retailerId, price: r.currentPrice, unitPrice: r.currentUnitPrice }));
+  candidates.push({ retailerId: input.retailerId, price: input.price, unitPrice });
+  const best = candidates.reduce((a, b) => (b.unitPrice < a.unitPrice ? b : a));
+
   return {
-    checkId: (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)).slice(0, 8),
+    checkId: newCheckId(),
     createdAt: now.toISOString(),
     input,
-    item: detail.item,
+    item,
     tier: tierFor(pct),
     unitPrice,
     avgUnitPrice: avg,
     pctVsAvg: pct,
     savingsVsAvg: (avg - unitPrice) * size,
-    low90: detail.stats.lowUnit90,
-    high90: detail.stats.highUnit90,
-    saleFreq12w: mine?.saleFreq12w ?? 0,
+    low90: stats.lowUnit90,
+    high90: stats.highUnit90,
+    saleFreq12w,
     best,
-    tricks: [],
+    tricks: detectTricks({
+      item, input, retailer: retailerById(input.retailerId), history: mineHistory,
+      size, inputUnit: unitPrice, pctVsAvg: pct, saleFreq12w,
+    }),
     dataPoints: detail.history.length,
   };
 }
@@ -105,19 +111,33 @@ export function searchItems(store: PriceStore, q: string, category?: Category): 
 
 export function getNearbyPrices(store: PriceStore, itemId: string, near: GeoPoint, limit = 8): NearbyStorePrice[] {
   const detail = getItemDetail(store, itemId);
-  return store.locations
+  const avg = detail.stats.avgUnit90;
+  const itemPoints = store.points.filter((p) => p.itemId === itemId);
+  const latestWeek = itemPoints.reduce((m, p) => (p.date > m ? p.date : m), "");
+
+  const out: NearbyStorePrice[] = [];
+  const nearest = store.locations
     .map((loc) => ({ loc, d: distanceKm(near, loc) }))
-    .sort((a, b) => a.d - b.d)
-    .slice(0, limit)
-    .map(({ loc, d }) => {
-      const branch = store.points.filter((p) => p.itemId === itemId && p.storeId === loc.id).sort((a, b) => b.date.localeCompare(a.date))[0];
-      const chain = detail.history.filter((p) => p.retailerId === loc.retailerId).slice(-1)[0];
-      const p = branch ?? chain;
-      const unit = unitPriceOf(p.price, p.sizeQty, p.multiBuy);
-      return {
-        store: loc, distanceKm: d, price: p.price, unitPrice: unit, onSale: p.onSale, multiBuy: p.multiBuy,
-        tier: tierFor((unit - detail.stats.avgUnit90) / detail.stats.avgUnit90),
-        priceScope: branch ? "store" : "chain", live: p.source === "scrape", date: p.date,
-      };
+    .sort((a, b) => a.d - b.d);
+  for (const { loc, d } of nearest) {
+    if (out.length >= limit) break;
+    const branch = itemPoints.find((p) => p.storeId === loc.id && p.date === latestWeek);
+    const chain = forRetailer(detail.history, loc.retailerId).slice(-1)[0];
+    const p = branch ?? chain;
+    if (!p) continue; // retailer has no data for this item
+    const unit = unitPriceOf(p.price, p.sizeQty, p.multiBuy);
+    out.push({
+      store: loc,
+      distanceKm: d,
+      price: p.price,
+      unitPrice: unit,
+      onSale: p.onSale,
+      multiBuy: p.multiBuy,
+      tier: tierFor((unit - avg) / avg),
+      priceScope: branch ? "store" : "chain",
+      live: p.source === "scrape",
+      date: p.date,
     });
+  }
+  return out;
 }
