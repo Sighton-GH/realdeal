@@ -1,19 +1,43 @@
-// STUB (SPEC-00). SCR-15 replaces. Contract used by ScanPage (SCR-14).
 import { Sheet } from "@/components/ui";
 
 export type SampleId = "sample-butter" | "sample-yogurt" | "sample-pasta";
+
 export const SAMPLES: Array<{ id: SampleId; src: string; label: string }> = [
-  { id: "sample-butter", src: "/samples/sample-butter.svg", label: "Butter sale tag" },
-  { id: "sample-yogurt", src: "/samples/sample-yogurt.svg", label: "Greek yogurt tag" },
-  { id: "sample-pasta", src: "/samples/sample-pasta.svg", label: "Spaghetti multi-buy tag" },
+  { id: "sample-butter", src: "/samples/sample-butter.svg", label: "Salted butter" },
+  { id: "sample-yogurt", src: "/samples/sample-yogurt.svg", label: "Greek yogurt" },
+  { id: "sample-pasta", src: "/samples/sample-pasta.svg", label: "Spaghetti" },
 ];
 
-export interface SampleSheetProps { open: boolean; onClose: () => void; onPick: (id: SampleId, src: string) => void }
+export interface SampleSheetProps {
+  open: boolean;
+  onClose: () => void;
+  onPick: (id: SampleId, src: string) => void;
+}
 
 export function SampleSheet({ open, onClose, onPick }: SampleSheetProps) {
   return (
     <Sheet open={open} onClose={onClose} title="Try a sample tag">
-      {SAMPLES.map((s) => <button key={s.id} type="button" className="block py-2" onClick={() => onPick(s.id, s.src)}>{s.label}</button>)}
+      <ul className="grid grid-cols-3 gap-3">
+        {SAMPLES.map((s) => (
+          <li key={s.id}>
+            <button
+              type="button"
+              onClick={() => {
+                onPick(s.id, s.src);
+                onClose();
+              }}
+              className="flex w-full flex-col items-stretch gap-2 text-left"
+            >
+              <img
+                src={s.src}
+                alt={`${s.label} shelf tag`}
+                className="lifted aspect-[4/3] w-full rounded-md bg-sunken object-cover"
+              />
+              <span className="text-small font-extrabold text-ink">{s.label}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </Sheet>
   );
 }
