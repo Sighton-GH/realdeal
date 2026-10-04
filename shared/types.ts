@@ -1,5 +1,5 @@
 // shared/types.ts: FROZEN contract. Change only via BLOCKERS.md and update every consumer.
-export type RetailerId = "saveon" | "nofrills" | "walmart" | "tnt" | "loblaws" | "metro" | "voila" | "galleria";
+export type RetailerId = "saveon" | "nofrills" | "walmart" | "tnt" | "loblaws";
 export type TileColour = "tangerine" | "pink" | "teal" | "violet" | "berry" | "forest" | "indigo" | "slate";
 export interface Retailer { id: RetailerId; name: string; shortName: string; tile: TileColour; website: string; }
 
