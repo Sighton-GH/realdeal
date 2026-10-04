@@ -46,7 +46,7 @@ export function RevealResult({ verdict, onReplay }: RevealResultProps) {
 
         <NearbyPrices
           itemId={itemId}
-          checkedPrice={{ retailerId: verdict.input.retailerId, unitPrice: verdict.unitPrice }}
+          checkedPrice={verdict.input.retailerId ? { retailerId: verdict.input.retailerId, unitPrice: verdict.unitPrice } : undefined}
           limit={4}
           title="Prices near you"
         />
