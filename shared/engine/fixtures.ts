@@ -43,7 +43,7 @@ function series(item: Item, retailerId: RetailerId, build: Build): PricePoint[] 
 }
 const flat = (price: number): Build => () => ({ price });
 
-const milkPrices: Record<RetailerId, number> = { saveon: 6.0, nofrills: 5.5, walmart: 5.8, tnt: 6.2 };
+const milkPrices: Partial<Record<RetailerId, number>> = { saveon: 6.0, nofrills: 5.5, walmart: 5.8, tnt: 6.2 };
 // Butter: Save-On is on sale 10 of the latest 12 weeks (weeks 15..24); Walmart only 5 of 12 (weeks 20..24).
 const butterSaveOn: Build = (w) => (w >= 15 && w <= 24 ? { price: 4, regularPrice: 5, onSale: true } : { price: 5 });
 const butterWalmart: Build = (w) => (w >= 20 && w <= 24 ? { price: 4, regularPrice: 5, onSale: true } : { price: 5 });
@@ -74,7 +74,7 @@ const branchNoFrillsStale: PricePoint = {
 export function buildFixtureStore(): PriceStore {
   const points: PricePoint[] = [];
   for (const r of RETAILER_IDS) {
-    points.push(...series(MILK, r, flat(milkPrices[r])));
+    points.push(...series(MILK, r, flat(milkPrices[r] ?? 6)));
     points.push(...series(BUTTER, r, r === "saveon" ? butterSaveOn : r === "walmart" ? butterWalmart : flat(5)));
     points.push(...series(PASTA, r, r === "tnt" ? pastaTnt : flat(2.6)));
     points.push(...series(YOGURT, r, r === "walmart" ? yogurtWalmart : () => ({ price: 4, sizeQty: 0.65 })));

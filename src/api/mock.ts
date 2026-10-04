@@ -4,8 +4,11 @@ import { checkPrice, generateSeedStore, getItemDetail, getNearbyPrices, searchIt
 import { getFeaturedDeals } from "@shared/seed/featured";
 import { TRICKS } from "@shared/content/tricks";
 import { RETAILERS } from "@shared/retailers";
+import { getStoreItems, getStoreSummaries } from "@shared/stores";
 
-const store: PriceStore = generateSeedStore();
+// Use the merged real-data store (data/prices.json from `npm run merge:data`) when it exists, else the seed store.
+const bundled = import.meta.glob("../../data/prices.json", { eager: true, import: "default" }) as Record<string, PriceStore>;
+const store: PriceStore = Object.values(bundled)[0] ?? generateSeedStore();
 
 const LATENCY_MS = 350;
 const SCAN_LATENCY_MS = 1800;
@@ -86,8 +89,14 @@ export const mockApi: Api = {
     wait<DataStatus>(() => ({
       mode: "mock",
       updatedAt: new Date(Date.now() - 2 * 3600_000).toISOString(),
-      sources: ["seed"],
-      retailers: RETAILERS.map((r) => ({ retailerId: r.id, ok: true, itemsFound: 40 })),
+      sources: Array.from(new Set(store.points.map((p) => p.source))),
+      retailers: RETAILERS.map((r) => ({
+        retailerId: r.id,
+        ok: true,
+        itemsFound: new Set(store.points.filter((p) => p.retailerId === r.id).map((p) => p.itemId)).size,
+      })),
     })),
+  getStores: () => wait(() => getStoreSummaries(store)),
+  getStoreItems: (retailerId: RetailerId) => wait(() => getStoreItems(store, retailerId)),
   getNearbyPrices: (itemId, near, limit) => wait(() => getNearbyPrices(store, itemId, near, limit)),
 };

@@ -5,7 +5,8 @@ import { Hono } from "hono";
 import { TRICKS } from "../../shared/content/tricks";
 import { RETAILERS } from "../../shared/retailers";
 import { getFeaturedDeals } from "../../shared/seed/featured";
-import type { Category, DataStatus, PriceCheckInput } from "../../shared/types";
+import { getStoreItems, getStoreSummaries } from "../../shared/stores";
+import type { Category, DataStatus, PriceCheckInput, RetailerId } from "../../shared/types";
 import { checkPrice, getItemDetail, getNearbyPrices, searchItems } from "../../shared/verdict";
 import { getStore } from "../data";
 import { type ScanImageInput, scanWithGemini } from "../scan";
@@ -221,6 +222,16 @@ apiRoute.post("/scan", async (c) => {
   const store = getStore();
   const scanResult = await scanWithGemini(scanInput, sampleId, store);
   return c.json(scanResult);
+});
+
+// GET /stores
+apiRoute.get("/stores", (c) => c.json(getStoreSummaries(getStore())));
+
+// GET /stores/:id/items
+apiRoute.get("/stores/:id/items", (c) => {
+  const id = c.req.param("id");
+  if (!RETAILERS.some((r) => r.id === id)) return c.json({ error: `Unknown retailerId: ${id}` }, 404);
+  return c.json(getStoreItems(getStore(), id as RetailerId));
 });
 
 // GET /tricks

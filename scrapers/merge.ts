@@ -69,7 +69,7 @@ async function run(): Promise<void> {
   console.log(`[Data Merge] Sanity check passed for all ${mergedStore.items.length} catalogue items.`);
 
   // 5. Write data/prices.json
-  await writeJson(PRICES_PATH, mergedStore);
+  fs.writeFileSync(PRICES_PATH, JSON.stringify(mergedStore)); // compact: the mock app bundles this file
   console.log(`[Data Merge] Wrote unified PriceStore to ${PRICES_PATH}`);
 
   // 6. Update data/status.json

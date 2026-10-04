@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { MagnifyingGlass } from "@phosphor-icons/react";
 import type { Item, MultiBuy, RetailerId, ScanResult } from "@shared/types";
-import { RETAILERS } from "@shared/retailers";
 import { Button, Chip, PriceText, Sheet, StoreTile, TextField } from "@/components/ui";
 import { ItemRow } from "@/components/domain";
 import { formatMoney, formatSize } from "@/lib/format";
+import { useMyRetailers } from "@/lib/useMyRetailers";
 import { useRunCheck } from "@/pages/check/useRunCheck";
 
 export interface ScanConfirmSheetProps {
@@ -62,6 +62,7 @@ function initialState(result: ScanResult, fallbackRetailerId: RetailerId | undef
 type Editing = "price" | "was" | "multi" | "size" | null;
 
 export function ScanConfirmSheet({ open, result, fallbackRetailerId, onRetake, onClose }: ScanConfirmSheetProps) {
+  const myRetailers = useMyRetailers();
   const { run, running, error } = useRunCheck();
   const [form, setForm] = useState<FormState>(() => initialState(result, fallbackRetailerId));
   const [showOthers, setShowOthers] = useState(false);
@@ -173,7 +174,7 @@ export function ScanConfirmSheet({ open, result, fallbackRetailerId, onRetake, o
         <section aria-label="Store" className="flex flex-col gap-2">
           <h3 className="text-h3">Which store?</h3>
           <div className="grid grid-cols-2 gap-3">
-            {RETAILERS.map((r) => (
+            {myRetailers.map((r) => (
               <StoreTile key={r.id} retailer={r} size="md" selected={retailerId === r.id} onClick={() => patch({ retailerId: r.id })} />
             ))}
           </div>

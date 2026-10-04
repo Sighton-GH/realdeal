@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { MapPin } from "@phosphor-icons/react";
 import type { RetailerId, StoreLocation } from "@shared/types";
-import { RETAILERS, retailerById } from "@shared/retailers";
+import { retailerById } from "@shared/retailers";
 import { Chip, Sheet, StoreTile } from "@/components/ui";
+import { useMyRetailers } from "@/lib/useMyRetailers";
 
 export interface StoreHintProps {
   /** branch the user is standing in, from GPS */
@@ -16,6 +17,7 @@ export interface StoreHintProps {
 }
 
 export function StoreHint({ suggested, chosen, locating, usingGps, onChoose, onUseLocation }: StoreHintProps) {
+  const myRetailers = useMyRetailers();
   const [open, setOpen] = useState(false);
   let label = "Which store?";
   if (chosen) label = retailerById(chosen).name;
@@ -30,7 +32,7 @@ export function StoreHint({ suggested, chosen, locating, usingGps, onChoose, onU
       </div>
       <Sheet open={open} onClose={() => setOpen(false)} title="Which store?">
         <div className="grid grid-cols-2 gap-3">
-          {RETAILERS.map((r) => (
+          {myRetailers.map((r) => (
             <StoreTile
               key={r.id}
               retailer={r}

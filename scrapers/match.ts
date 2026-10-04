@@ -59,7 +59,7 @@ interface ConflictRule {
 const CONFLICT_RULES: ConflictRule[] = [
   // Salted butter cannot match unsalted or margarine
   {
-    itemFilter: (item) => item.id.includes("butter-salted") || (item.name.toLowerCase().includes("salted") && item.name.toLowerCase().includes("butter")),
+    itemFilter: (item) => item.id.includes("butter-salted") || (/\bsalted\b/i.test(item.name) && item.name.toLowerCase().includes("butter")),
     rejectWords: ["unsalted", "sweet", "margarine", "peanut", "vegan"],
   },
   // Butter cannot match peanut butter

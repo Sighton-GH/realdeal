@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { RetailerId } from "@shared/types";
-import { RETAILERS } from "@shared/retailers";
 import { StoreTile } from "@/components/ui/StoreTile";
 import { play } from "@/lib/sfx";
+import { useMyRetailers } from "@/lib/useMyRetailers";
 
 export interface StepStoreProps {
   selectedId: RetailerId | null;
@@ -10,6 +10,7 @@ export interface StepStoreProps {
 }
 
 export function StepStore({ selectedId, onSelect }: StepStoreProps) {
+  const myRetailers = useMyRetailers();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Show the choice immediately; the parent only hears about it after the 250ms beat
   const [pendingId, setPendingId] = useState<RetailerId | null>(null);
@@ -34,7 +35,7 @@ export function StepStore({ selectedId, onSelect }: StepStoreProps) {
     <div className="flex flex-col gap-6 py-4">
       <h2 className="font-display text-h2 font-bold text-ink">Where are you shopping?</h2>
       <div className="grid grid-cols-2 gap-3.5">
-        {RETAILERS.map((retailer) => {
+        {myRetailers.map((retailer) => {
           const isSelected = activeId === retailer.id;
           const isFaded = activeId !== null && !isSelected;
           return (

@@ -111,7 +111,7 @@ export function CheckHomePage() {
             <EmptyState
               mood="meh"
               title="Penny doesn't track that yet"
-              body="We cover 40 everyday groceries for now. Try milk, eggs, flour, or bananas."
+              body="We cover a growing list of everyday groceries. Try milk, eggs, flour, or bananas."
             />
           )}
           {search.data?.map((item) => (

@@ -37,7 +37,7 @@ describe("deterministic seed generator", () => {
     }
 
     for (const item of store.items) {
-      for (const retailer of RETAILERS) {
+      for (const retailer of RETAILERS.filter((r) => ["saveon", "nofrills", "walmart", "tnt"].includes(r.id))) {
         const itemRetailerPoints = chainPoints.filter(
           (p) => p.itemId === item.id && p.retailerId === retailer.id,
         );

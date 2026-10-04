@@ -1,5 +1,5 @@
 // shared/types.ts: FROZEN contract. Change only via BLOCKERS.md and update every consumer.
-export type RetailerId = "saveon" | "nofrills" | "walmart" | "tnt";
+export type RetailerId = "saveon" | "nofrills" | "walmart" | "tnt" | "loblaws" | "metro" | "voila" | "galleria";
 export type TileColour = "tangerine" | "pink" | "teal" | "violet";
 export interface Retailer { id: RetailerId; name: string; shortName: string; tile: TileColour; website: string; }
 
@@ -153,6 +153,25 @@ export interface DataStatus {
   retailers: Array<{ retailerId: RetailerId; ok: boolean; lastScrapedAt?: string; itemsFound: number; message?: string }>;
 }
 
+export interface StoreSummary {
+  retailerId: RetailerId;
+  itemCount: number;       // catalogue items with any chain-level price at this store
+  realItemCount: number;   // of those, items whose latest price is real data (not seed)
+  weeksOfData: number;     // longest run of weekly prices for one item
+  latestDate: string;      // most recent price date at this store (YYYY-MM-DD)
+  sources: Array<"seed" | "hammer" | "scrape">;
+}
+
+export interface StoreItemRow {
+  item: Item;
+  price: number;
+  regularPrice: number;
+  onSale: boolean;
+  unitPrice: number;
+  date: string;
+  source: "seed" | "hammer" | "scrape";
+}
+
 export interface Api {
   searchItems(q: string, category?: Category): Promise<Item[]>;
   getItem(id: string): Promise<ItemDetail>;
@@ -162,4 +181,6 @@ export interface Api {
   listTricks(): Promise<TrickInfo[]>;
   getDataStatus(): Promise<DataStatus>;
   getNearbyPrices(itemId: string, near: GeoPoint, limit?: number): Promise<NearbyStorePrice[]>;  // nearest first
+  getStores(): Promise<StoreSummary[]>;
+  getStoreItems(retailerId: RetailerId): Promise<StoreItemRow[]>;
 }

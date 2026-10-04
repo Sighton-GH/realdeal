@@ -3,7 +3,6 @@ import path from "node:path";
 import readline from "node:readline";
 import { ITEMS } from "../shared/seed/items";
 import type { PricePoint, RetailerId } from "../shared/types";
-import { writeJson } from "./lib/io";
 import { mondayOf } from "./lib/week";
 import { matchProduct } from "./match";
 import type { RawProduct } from "./types";
@@ -41,7 +40,11 @@ function mapVendor(vendorStr: string): RetailerId | null {
   if (s.includes("save-on") || s.includes("saveon") || s.includes("save on")) return "saveon";
   if (s.includes("no frills") || s.includes("nofrills")) return "nofrills";
   if (s.includes("walmart")) return "walmart";
-  if (s.includes("t&t") || s.includes("t & t") || s.includes("tnt")) return "tnt";
+  if (s.includes("t&t") || s.includes("t & t") || s.includes("tnt") || s.includes("tandt")) return "tnt";
+  if (s.includes("loblaws")) return "loblaws";
+  if (s.includes("metro")) return "metro";
+  if (s.includes("voila")) return "voila";
+  if (s.includes("galleria")) return "galleria";
   return null;
 }
 
@@ -139,14 +142,16 @@ async function run(): Promise<void> {
     };
 
     // Match against our catalogue items
+    let best: { item: (typeof ITEMS)[number]; score: number } | null = null;
     for (const item of ITEMS) {
       const match = matchProduct(item, [rawProduct]);
-      if (match) {
-        const isPerKgProduce = item.unit === "kg" && item.sizeQty === 1;
-        const perLb = isPerKgProduce && PER_LB_PATTERN.test(`${size ?? ""} ${name}`);
-        matchedProducts.set(prodId, { itemId: item.id, retailerId, perLb });
-        break;
-      }
+      if (match && (!best || match.score > best.score)) best = { item, score: match.score };
+    }
+    if (best) {
+      const item = best.item;
+      const isPerKgProduce = item.unit === "kg" && item.sizeQty === 1;
+      const perLb = isPerKgProduce && PER_LB_PATTERN.test(`${size ?? ""} ${name}`);
+      matchedProducts.set(prodId, { itemId: item.id, retailerId, perLb });
     }
   }
 
@@ -262,7 +267,7 @@ async function run(): Promise<void> {
   }
 
   // Write output
-  await writeJson(OUTPUT_FILE, points);
+  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(points)); // compact: large file
   console.log(`[Hammer Import] Wrote ${points.length} historical price points to ${OUTPUT_FILE}`);
 
   // Step 4: Coverage and recency reporting

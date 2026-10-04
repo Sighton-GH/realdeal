@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { GeoPoint, Verdict } from "@shared/types";
+import type { GeoPoint, RetailerId, Verdict } from "@shared/types";
 
 export interface UserLocation { point: GeoPoint; label: string; source: "gps" | "default" }
 export const DEFAULT_LOCATION: UserLocation = { point: { lat: 49.2781, lng: -122.9199 }, label: "SFU Burnaby", source: "default" };
@@ -12,6 +12,9 @@ interface AppState {
   clearChecks: () => void;
   soundOn: boolean;
   toggleSound: () => void;
+  /** stores the user does not shop at; hidden from the store pickers */
+  hiddenStores: RetailerId[];
+  toggleStore: (id: RetailerId) => void;
   location: UserLocation;
   setLocation: (loc: UserLocation) => void;
 }
@@ -25,6 +28,9 @@ export const useAppStore = create<AppState>()(
       clearChecks: () => set({ recentChecks: [] }),
       soundOn: true,
       toggleSound: () => set((s) => ({ soundOn: !s.soundOn })),
+      hiddenStores: [],
+      toggleStore: (id) =>
+        set((s) => ({ hiddenStores: s.hiddenStores.includes(id) ? s.hiddenStores.filter((x) => x !== id) : [...s.hiddenStores, id] })),
       location: DEFAULT_LOCATION,
       setLocation: (location) => set({ location }),
     }),

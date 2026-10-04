@@ -8,6 +8,9 @@ import type {
   ItemDetail,
   NearbyStorePrice,
   PriceCheckInput,
+  RetailerId,
+  StoreItemRow,
+  StoreSummary,
   ScanResult,
   TrickInfo,
   Verdict,
@@ -92,6 +95,14 @@ export const liveApi: Api = {
 
   async listTricks(): Promise<TrickInfo[]> {
     return apiFetch<TrickInfo[]>("/api/tricks");
+  },
+
+  async getStores(): Promise<StoreSummary[]> {
+    return apiFetch<StoreSummary[]>("/api/stores");
+  },
+
+  async getStoreItems(retailerId: RetailerId): Promise<StoreItemRow[]> {
+    return apiFetch<StoreItemRow[]>(`/api/stores/${encodeURIComponent(retailerId)}/items`);
   },
 
   async getDataStatus(): Promise<DataStatus> {

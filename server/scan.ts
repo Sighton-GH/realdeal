@@ -151,6 +151,10 @@ function mapRetailer(storeName?: string | null): RetailerId | undefined {
   if (s.includes("t&t") || s.includes("t & t") || s.includes("tnt")) {
     return "tnt";
   }
+  if (s.includes("loblaws")) return "loblaws";
+  if (s.includes("metro")) return "metro";
+  if (s.includes("voila") || s.includes("voilà")) return "voila";
+  if (s.includes("galleria")) return "galleria";
   return undefined;
 }
 

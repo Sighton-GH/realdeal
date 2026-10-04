@@ -42,7 +42,9 @@ function roundToShelfPrice(price: number, retailerId: RetailerId): number {
   return bestCandidate;
 }
 
-const BASE_MULT: Record<RetailerId, number> = {
+/** Only the original four chains get generated seed prices; the other chains come from Project Hammer data only. */
+const SEED_RETAILER_IDS: RetailerId[] = ["saveon", "nofrills", "walmart", "tnt"];
+const BASE_MULT: Partial<Record<RetailerId, number>> = {
   nofrills: 0.92,
   walmart: 0.95,
   tnt: 1.03,
@@ -354,10 +356,10 @@ function generateChainPoints(seedItem: SeedItem, dates: string[]): PricePoint[] 
   }
 
   // Non-hero items
-  for (const r of RETAILERS) {
+  for (const r of RETAILERS.filter((x) => SEED_RETAILER_IDS.includes(x.id))) {
     const rng = mulberry32(hashString(itemId + r.id));
     const jitter = rng() * 0.06 - 0.03;
-    const storeMultiplier = BASE_MULT[r.id] * (1 + jitter);
+    const storeMultiplier = (BASE_MULT[r.id] ?? 1) * (1 + jitter);
 
     for (let w = 0; w < 26; w++) {
       const date = dates[w];

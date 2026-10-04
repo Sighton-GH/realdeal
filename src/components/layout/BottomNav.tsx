@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from "react-router";
-import { Detective, Scan, Tag } from "@phosphor-icons/react";
+import { Detective, GearSix, Scan, Storefront, Tag } from "@phosphor-icons/react";
 import { cn } from "@/lib/cn";
 
 const side = "flex min-h-12 min-w-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-sm text-micro";
@@ -27,6 +27,14 @@ export function BottomNav() {
       ) : (
         <NavLink to="/check" className={checkClass}>{checkContent}</NavLink>
       )}
+      <NavLink to="/stores" className={({ isActive }) => cn(side, isActive || pathname.startsWith("/stores") ? activeClass : inactiveClass)}>
+        {({ isActive }) => (
+          <>
+            <Storefront size={26} weight={isActive ? "fill" : "bold"} aria-hidden="true" />
+            <span>Stores</span>
+          </>
+        )}
+      </NavLink>
       <NavLink to="/scan" className="flex min-w-12 flex-1 flex-col items-center gap-2 rounded-sm text-micro font-extrabold text-grape-500">
         <span className="press -mt-[18px] flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-grape-500 text-white [--lip:var(--color-grape-700)] motion-reduce:transition-none motion-reduce:active:transform-none">
           <Scan size={30} weight="bold" aria-hidden="true" />
@@ -37,7 +45,15 @@ export function BottomNav() {
         {({ isActive }) => (
           <>
             <Detective size={26} weight={isActive ? "fill" : "bold"} aria-hidden="true" />
-            <span>Tricks</span>
+            <span>Tips</span>
+          </>
+        )}
+      </NavLink>
+      <NavLink to="/settings" className={({ isActive }) => cn(side, isActive ? activeClass : inactiveClass)}>
+        {({ isActive }) => (
+          <>
+            <GearSix size={26} weight={isActive ? "fill" : "bold"} aria-hidden="true" />
+            <span>Settings</span>
           </>
         )}
       </NavLink>
