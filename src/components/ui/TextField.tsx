@@ -1,5 +1,5 @@
-// STUB (SPEC-00). UI-04 replaces; props are final.
 import { useId } from "react";
+import { WarningCircle } from "@phosphor-icons/react";
 import { cn } from "@/lib/cn";
 
 export interface TextFieldProps {
@@ -9,15 +9,38 @@ export interface TextFieldProps {
 
 export function TextField({ label, value, onChange, placeholder, inputMode = "text", prefix, suffix, error, className }: TextFieldProps) {
   const id = useId();
+  const errorId = `${id}-error`;
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <label htmlFor={id} className="text-small font-extrabold">{label}</label>
-      <div className={cn("flex h-14 items-center gap-2 rounded-sm border-2 bg-sunken px-4", error ? "border-high" : "border-transparent focus-within:border-grape-400 focus-within:bg-canvas")}>
-        {prefix && <span className="text-ink-soft">{prefix}</span>}
-        <input id={id} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} inputMode={inputMode} className="min-w-0 flex-1 bg-transparent font-bold outline-none" />
-        {suffix && <span className="text-ink-soft">{suffix}</span>}
+    <div className={cn("flex flex-col gap-2", className)}>
+      <label htmlFor={id} className="text-small font-extrabold text-ink">{label}</label>
+      <div
+        className={cn(
+          "flex h-14 items-center gap-2 rounded-sm border-2 bg-sunken px-4",
+          error
+            ? "border-high focus-within:bg-canvas"
+            : "border-transparent focus-within:border-grape-400 focus-within:bg-canvas",
+        )}
+      >
+        {prefix && <span aria-hidden="true" className="text-body font-bold text-ink-soft">{prefix}</span>}
+        <input
+          id={id}
+          type="text"
+          inputMode={inputMode}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          className="h-full min-w-0 flex-1 bg-transparent text-body font-bold text-ink outline-none placeholder:font-semibold placeholder:text-ink-soft"
+        />
+        {suffix && <span aria-hidden="true" className="text-body font-bold text-ink-soft">{suffix}</span>}
       </div>
-      {error && <p className="text-small text-high-lip">{error}</p>}
+      {error && (
+        <p id={errorId} role="alert" className="flex items-start gap-1.5 text-small font-bold text-high-lip">
+          <WarningCircle weight="fill" aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <span>{error}</span>
+        </p>
+      )}
     </div>
   );
 }
