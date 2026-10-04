@@ -5,6 +5,10 @@ export interface Retailer { id: RetailerId; name: string; shortName: string; til
 
 export type Category = "produce" | "dairy" | "bakery" | "pantry" | "meat" | "seafood" | "frozen" | "snacks" | "drinks" | "household";
 export type Unit = "kg" | "L" | "each" | "dozen";
+/** A unit as printed on a shelf tag. Converted to the item's Unit with shared/units.ts. */
+export type TagUnit = "g" | "kg" | "lb" | "oz" | "mL" | "L" | "each" | "dozen";
+/** The amount a printed price is for: { qty: 1, unit: "lb" } for "$1.27 /lb", { qty: 454, unit: "g" } for a 454 g pack. */
+export interface TagAmount { qty: number; unit: TagUnit }
 export type ArtKey =
   | "milk" | "eggs" | "butter" | "cheese" | "yogurt" | "sourcream" | "flour" | "bread" | "bagel"
   | "sugar" | "oats" | "pasta" | "rice" | "oil" | "jar" | "can" | "carton" | "banana" | "apple"
