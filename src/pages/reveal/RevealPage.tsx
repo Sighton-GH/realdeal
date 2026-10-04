@@ -32,7 +32,7 @@ function CloseButton({ onDark, className }: { onDark: boolean; className?: strin
 function RevealScene({ verdict }: { verdict: Verdict }) {
   const reduced = useReducedMotion() ?? false;
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { phase, count, suspicious, runId, skip, replay } = useRevealSequence(verdict, reduced, canvasRef);
+  const { phase, suspicious, runId, skip, replay } = useRevealSequence(verdict, reduced, canvasRef);
   const meta = tierMeta[verdict.tier];
   const shake = !reduced && verdict.tier === "high" && phase === "slam";
   const revealed = phase === "slam" || phase === "result";
@@ -46,7 +46,7 @@ function RevealScene({ verdict }: { verdict: Verdict }) {
         transition={{ duration: 0.4 }}
         onClick={skip}
       >
-        <Stage verdict={verdict} phase={phase} count={count} suspicious={suspicious} runId={runId} reduced={reduced} />
+        <Stage verdict={verdict} phase={phase} suspicious={suspicious} runId={runId} reduced={reduced} />
         {phase === "result" && (
           <motion.div
             key={`panel-${runId}`}
@@ -59,7 +59,7 @@ function RevealScene({ verdict }: { verdict: Verdict }) {
           </motion.div>
         )}
       </motion.div>
-      {(phase === "suspense" || phase === "countdown") && (
+      {phase === "suspense" && (
         <button
           type="button"
           onClick={skip}

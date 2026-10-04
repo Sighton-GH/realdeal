@@ -12,19 +12,18 @@ import { Stars } from "./Stars";
 export interface StageProps {
   verdict: Verdict;
   phase: RevealPhase;
-  count: number;
   suspicious: boolean;
   runId: number;
   reduced: boolean;
 }
 
-/** The coloured stage: suspense, countdown, slam, then the shrunk header above the result panel. */
-export function Stage({ verdict, phase, count, suspicious, runId, reduced }: StageProps) {
+/** The coloured stage: suspense, slam, then the shrunk header above the result panel. */
+export function Stage({ verdict, phase, suspicious, runId, reduced }: StageProps) {
   const meta = tierMeta[verdict.tier];
   const revealed = phase === "slam" || phase === "result";
   const compact = phase === "result";
-  const pennyMood = revealed ? (suspicious ? "suspicious" : meta.mood) : phase === "countdown" ? "idle" : "thinking";
-  const pennySize = revealed ? (compact ? 120 : 180) : phase === "countdown" ? 96 : 160;
+  const pennyMood = revealed ? (suspicious ? "suspicious" : meta.mood) : "thinking";
+  const pennySize = revealed ? (compact ? 120 : 180) : 160;
 
   return (
     <motion.div
@@ -58,28 +57,6 @@ export function Stage({ verdict, phase, count, suspicious, runId, reduced }: Sta
               <Counter from={0} to={verdict.dataPoints} seconds={1.1} label="Prices compared" />
             </div>
           </>
-        )}
-
-        {phase === "countdown" && (
-          <div className="relative flex h-[200px] w-[200px] items-center justify-center">
-            <motion.div
-              aria-hidden="true"
-              className="absolute inset-0 rounded-full bg-grape-500"
-              animate={{ scale: [1, 1.08, 1] }}
-              transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
-            />
-            <motion.span
-              key={count}
-              role="status"
-              aria-label={String(count)}
-              className="relative font-display text-[120px] font-bold leading-none text-white"
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: [0.5, 1.1, 1], opacity: 1 }}
-              transition={{ duration: 0.4, times: [0, 0.6, 1], ease: "easeOut" }}
-            >
-              {count}
-            </motion.span>
-          </div>
         )}
 
         {revealed && (

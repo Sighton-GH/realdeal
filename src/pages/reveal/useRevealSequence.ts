@@ -3,32 +3,28 @@ import type { Verdict } from "@shared/types";
 import { play } from "@/lib/sfx";
 import { createEffects, type Effects } from "./effects";
 
-export type RevealPhase = "suspense" | "countdown" | "slam" | "result";
+export type RevealPhase = "suspense" | "slam" | "result";
 
-const COUNTDOWN_AT = 1200;
-const STEP_MS = 400;
-const SLAM_AT = 2400;
+const SLAM_AT = 1200;
 const SLAM_SOUND_DELAY = 150;
 const RESULT_AFTER_SLAM = 800;
 const SUSPICIOUS_AFTER = 700;
 
 export interface RevealSequence {
   phase: RevealPhase;
-  count: number;
   suspicious: boolean;
   runId: number;
   skip: () => void;
   replay: () => void;
 }
 
-/** Drives the reveal: suspense, countdown, slam, result. All timers are cancelled on replay and unmount. */
+/** Drives the reveal: suspense, slam, result. All timers are cancelled on replay and unmount. */
 export function useRevealSequence(
   verdict: Verdict,
   reduced: boolean,
   canvasRef: RefObject<HTMLCanvasElement | null>,
 ): RevealSequence {
   const [phase, setPhase] = useState<RevealPhase>(reduced ? "result" : "suspense");
-  const [count, setCount] = useState(3);
   const [suspicious, setSuspicious] = useState(false);
   const [runId, setRunId] = useState(0);
   const timers = useRef<number[]>([]);
@@ -73,12 +69,6 @@ export function useRevealSequence(
   useEffect(() => {
     if (reduced) return undefined;
     play("drumroll");
-    later(() => {
-      setPhase("countdown");
-      setCount(3);
-    }, COUNTDOWN_AT);
-    later(() => setCount(2), COUNTDOWN_AT + STEP_MS);
-    later(() => setCount(1), COUNTDOWN_AT + STEP_MS * 2);
     later(enterSlam, SLAM_AT);
     return clearTimers;
   }, [runId, reduced, later, enterSlam, clearTimers]);
@@ -94,17 +84,16 @@ export function useRevealSequence(
   );
 
   const skip = useCallback(() => {
-    if (phase === "suspense" || phase === "countdown") enterSlam();
+    if (phase === "suspense") enterSlam();
   }, [phase, enterSlam]);
 
   const replay = useCallback(() => {
     clearTimers();
     effects.current?.reset();
     setSuspicious(false);
-    setCount(3);
     setPhase(reduced ? "result" : "suspense");
     setRunId((n) => n + 1);
   }, [clearTimers, reduced]);
 
-  return { phase, count, suspicious, runId, skip, replay };
+  return { phase, suspicious, runId, skip, replay };
 }
