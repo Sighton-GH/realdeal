@@ -63,8 +63,9 @@ export function getItemDetail(store: PriceStore, itemId: string): ItemDetail {
 export function checkPrice(store: PriceStore, input: PriceCheckInput, now: Date = new Date()): Verdict {
   const detail = getItemDetail(store, input.itemId);
   const { item, stats } = detail;
-  const mineHistory = forRetailer(detail.history, input.retailerId);
-  const mine = stats.byRetailer.find((r) => r.retailerId === input.retailerId);
+  const rid = input.retailerId;
+  const mineHistory = rid ? forRetailer(detail.history, rid) : [];
+  const mine = rid ? stats.byRetailer.find((r) => r.retailerId === rid) : undefined;
 
   const size = input.sizeQty ?? mine?.currentSizeQty ?? item.sizeQty;
   const unitPrice = unitPriceOf(input.price, size, input.multiBuy);
@@ -73,10 +74,10 @@ export function checkPrice(store: PriceStore, input: PriceCheckInput, now: Date 
   const saleFreq12w = mine?.saleFreq12w ?? 0;
 
   // Cheapest current price: every retailer's latest point, with the input store at the input price.
-  const candidates = stats.byRetailer
-    .filter((r) => r.retailerId !== input.retailerId)
+  const candidates: Verdict["best"][] = stats.byRetailer
+    .filter((r) => r.retailerId !== rid)
     .map((r) => ({ retailerId: r.retailerId, price: r.currentPrice, unitPrice: r.currentUnitPrice }));
-  candidates.push({ retailerId: input.retailerId, price: input.price, unitPrice });
+  candidates.push({ retailerId: rid, price: input.price, unitPrice });
   const best = candidates.reduce((a, b) => (b.unitPrice < a.unitPrice ? b : a));
 
   return {
@@ -94,7 +95,7 @@ export function checkPrice(store: PriceStore, input: PriceCheckInput, now: Date 
     saleFreq12w,
     best,
     tricks: detectTricks({
-      item, input, retailer: retailerById(input.retailerId), history: mineHistory,
+      item, input, retailer: rid ? retailerById(rid) : undefined, history: mineHistory,
       size, inputUnit: unitPrice, pctVsAvg: pct, saleFreq12w,
     }),
     dataPoints: detail.history.length,

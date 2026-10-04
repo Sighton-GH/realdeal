@@ -4,7 +4,7 @@ import { formatSize, median, money, unitPriceOf, unitWord } from "./util";
 export interface TrickContext {
   item: Item;
   input: PriceCheckInput;
-  retailer: Retailer;
+  retailer?: Retailer;
   /** chain-level points at the input retailer, oldest first */
   history: PricePoint[];
   /** the size used to compute inputUnit */
@@ -25,7 +25,7 @@ export function detectTricks(c: TrickContext): TrickFlag[] {
   // Forever sale
   const saleWeeks = last12.filter((p) => p.onSale).length;
   const latest = history[history.length - 1];
-  if (c.saleFreq12w >= 0.5 && (input.wasPrice !== undefined || latest?.onSale === true)) {
+  if (retailer && c.saleFreq12w >= 0.5 && (input.wasPrice !== undefined || latest?.onSale === true)) {
     tricks.push({
       type: "perpetual_sale",
       title: "Forever sale",
