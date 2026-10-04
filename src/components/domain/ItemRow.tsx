@@ -10,17 +10,20 @@ export interface ItemRowProps {
   right?: ReactNode;
   onClick?: () => void;
   className?: string;
+  showSizes?: boolean;
 }
 
-export function ItemRow({ item, right, onClick, className }: ItemRowProps) {
+export function ItemRow({ item, right, onClick, className, showSizes = true }: ItemRowProps) {
   const sizeSummary = formatAvailableSizesSummary(item);
   const content = <>
     <ItemArt artKey={item.artKey} size={48} />
     <span className="min-w-0 flex-1">
       <span className="block truncate font-body text-h3 font-extrabold">{item.name}</span>
-      <span className="block truncate text-small font-bold text-ink-soft">
-        Sizes: {sizeSummary}
-      </span>
+      {showSizes ? (
+        <span className="block truncate text-small font-bold text-ink-soft">
+          Sizes: {sizeSummary}
+        </span>
+      ) : null}
     </span>
     {right != null && <span className="shrink-0">{right}</span>}
     {onClick && <CaretRight aria-hidden="true" size={20} weight="bold" className="shrink-0 text-ink-soft" />}
