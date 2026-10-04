@@ -22,7 +22,7 @@ app.route("/api", apiRoute);
 // Mount static hosting & SPA fallback
 setupStatic(app);
 
-const port = Number(process.env.PORT ?? 8787);
+const port = Number(process.env.PORT ?? 8788);
 const server = serve({ fetch: app.fetch, port }, () => {
   const store = getStore();
   const sources = Array.from(new Set(store.points.map((p) => p.source))).join(", ");

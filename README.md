@@ -13,8 +13,8 @@ Live mode (real data, Gemini scanning, one port for the Cloudflare tunnel):
 
 ```
 cp .env.example .env   # fill in keys, set VITE_API_MODE=live
-npm run start          # http://localhost:8787
-cloudflared tunnel --url http://localhost:8787
+npm run start          # http://localhost:8788
+cloudflared tunnel --url http://localhost:8788
 ```
 
 Other scripts: `npm run typecheck`, `lint`, `test`, `build`, `scrape`, `import:hammer`, `merge:data`.

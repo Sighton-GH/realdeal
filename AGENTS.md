@@ -22,7 +22,7 @@ If you truly need a new dependency, do not install it. Write it in BLOCKERS.md a
 
 - `npm run dev`: frontend on http://localhost:5173 (mock API by default)
 - `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build`
-- `npm run server`: live API + built frontend on http://localhost:8787 (BE-07)
+- `npm run server`: live API + built frontend on http://localhost:8788 (BE-07)
 - `npm run scrape`: collect current prices from store websites (BE-06)
 
 ## Folder map (who owns what is listed in each spec)

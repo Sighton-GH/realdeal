@@ -44,14 +44,14 @@ For any item, store, and week, a scraped point beats a Hammer point, which beats
 Browser (React app)
    |  api (src/api/client.ts)
    |-- mock mode: shared engine + seed data, in the browser   <- default, zero setup
-   '-- live mode: fetch /api/*  ->  Hono server (port 8787)
+   '-- live mode: fetch /api/*  ->  Hono server (port 8788)
                                      |- shared engine (same code as mock)
                                      |- data/prices.json (seed + Hammer + scraped, merged)
                                      |- Gemini (scan a price tag)
                                      |- ElevenLabs (Penny's voice, optional)
                                      '- Tiger Data / Postgres (optional mirror + stats)
 scrapers/ (npm run scrape)  ->  data/scraped/*.json  ->  merged into data/prices.json
-Cloudflare tunnel -> localhost:8787
+Cloudflare tunnel -> localhost:8788
 ```
 
 The verdict engine lives in `shared/` and is the same code in mock and live mode, so the frontend never cares which one is running.
