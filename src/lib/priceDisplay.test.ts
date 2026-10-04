@@ -30,7 +30,7 @@ describe("price display preference", () => {
 });
 
 
-it("gives all eight stores distinct tile colours and usable CSS classes", () => {
-  expect(new Set(RETAILERS.map((retailer) => retailer.tile)).size).toBe(8);
+it("gives every store a distinct tile colour and a usable CSS class", () => {
+  expect(new Set(RETAILERS.map((retailer) => retailer.tile)).size).toBe(RETAILERS.length);
   for (const retailer of RETAILERS) expect(tileClass[retailer.tile]).toContain(`bg-${retailer.tile}`);
 });
