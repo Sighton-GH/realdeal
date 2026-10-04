@@ -1,4 +1,4 @@
-import type { RetailerId, Verdict } from "@shared/types";
+import type { Verdict } from "@shared/types";
 import { retailerById } from "@shared/retailers";
 import { Card } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -16,12 +16,14 @@ const dotClass: Record<ReturnType<typeof retailerById>["tile"], string> = {
 /** True when another store is at least 3% cheaper per unit than the checked price. */
 export function hasCheaperElsewhere(verdict: Verdict): boolean {
   const { best, input, unitPrice } = verdict;
+  if (best.retailerId === undefined) return false;
   return best.retailerId !== input.retailerId && best.unitPrice <= unitPrice * 0.97;
 }
 
 export function CheaperElsewhere({ verdict }: { verdict: Verdict }) {
   const mode = useAppStore((s) => s.priceDisplay);
-  const id: RetailerId = verdict.best.retailerId;
+  const id = verdict.best.retailerId;
+  if (id === undefined) return null;
   const retailer = retailerById(id);
   return (
     <Card>

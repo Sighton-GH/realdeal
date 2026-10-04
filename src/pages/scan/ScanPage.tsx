@@ -1,19 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import type { RetailerId, ScanResult } from "@shared/types";
+import type { ScanResult } from "@shared/types";
 import { api } from "@/api/client";
 import { useTopBar } from "@/components/layout";
 import { play } from "@/lib/sfx";
+import { useUserLocation } from "@/lib/useUserLocation";
 import { captureFrame, prepareImageFile } from "./captureFrame";
 import { FailurePanel, type FailureAction } from "./FailurePanel";
 import { ReadingOverlay } from "./ReadingOverlay";
 import { SampleSheet, type SampleId } from "./SampleSheet";
 import { ScanConfirmSheet } from "./ScanConfirmSheet";
-import { StoreHint } from "./StoreHint";
 import { useCamera } from "./useCamera";
 import { Viewfinder } from "./Viewfinder";
 import { useGuideRect } from "./parts/useGuideRect";
-import { useNearestStore } from "./parts/useNearestStore";
 
 type Phase = "viewfinder" | "reading" | "confirm" | "failed";
 type Request = { blob: Blob | null; sampleId?: SampleId };
@@ -42,14 +41,17 @@ export function ScanPage() {
   const [failureMessage, setFailureMessage] = useState<string | undefined>();
   const [flash, setFlash] = useState(false);
   const [samplesOpen, setSamplesOpen] = useState(false);
-  const [chosen, setChosen] = useState<RetailerId | undefined>();
   const lastRequest = useRef<Request | null>(null);
   const requestId = useRef(0);
   const photoRef = useRef(photo);
   photoRef.current = photo;
 
-  const nearest = useNearestStore();
-  const fallbackRetailerId = chosen ?? nearest.suggested?.retailerId;
+  const loc = useUserLocation();
+  const locRef = useRef(loc);
+  locRef.current = loc;
+  useEffect(() => {
+    if (locRef.current.source !== "gps" && locRef.current.status === "idle") locRef.current.request();
+  }, []);
 
   // Start the camera once on mount; the hook stops it on unmount.
   const startRef = useRef(camera.start);
@@ -151,7 +153,7 @@ export function ScanPage() {
 
   const typeItIn = () => {
     const candidate = result?.candidates[0];
-    const store = result?.retailerId ?? fallbackRetailerId;
+    const store = result?.retailerId;
     if (candidate) navigate(`/check/${candidate.id}${store ? `?store=${store}` : ""}`);
     else navigate("/check?focus=search");
   };
@@ -194,22 +196,14 @@ export function ScanPage() {
           guide={guide}
           torchSupported={camera.torchSupported}
           torchOn={camera.torchOn}
+          focusSupported={camera.focusSupported}
+          onFocusAt={(p) => void camera.focusAt(p)}
           onToggleTorch={() => void camera.toggleTorch()}
           onClose={close}
           onShutter={() => void onShutter()}
           onPickPhoto={pickPhoto}
           onTypeIt={() => navigate("/check?focus=search")}
           onTrySample={trySample}
-          hint={
-            <StoreHint
-              suggested={nearest.suggested}
-              chosen={chosen}
-              locating={nearest.locating}
-              usingGps={nearest.usingGps}
-              onChoose={setChosen}
-              onUseLocation={nearest.requestLocation}
-            />
-          }
         />
       </div>
 
@@ -244,7 +238,7 @@ export function ScanPage() {
       />
 
       {result && result.status === "ok" && (
-        <ScanConfirmSheet open={phase === "confirm"} result={result} fallbackRetailerId={fallbackRetailerId} onRetake={retake} onClose={backToViewfinder} />
+        <ScanConfirmSheet open={phase === "confirm"} result={result} onRetake={retake} onClose={backToViewfinder} />
       )}
       <SampleSheet open={samplesOpen} onClose={() => setSamplesOpen(false)} onPick={onPickSample} />
     </div>

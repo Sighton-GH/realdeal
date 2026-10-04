@@ -1,10 +1,14 @@
 // shared/types.ts: FROZEN contract. Change only via BLOCKERS.md and update every consumer.
-export type RetailerId = "saveon" | "nofrills" | "walmart" | "tnt" | "loblaws" | "metro" | "voila" | "galleria";
+export type RetailerId = "saveon" | "nofrills" | "walmart" | "tnt" | "loblaws";
 export type TileColour = "tangerine" | "pink" | "teal" | "violet" | "berry" | "forest" | "indigo" | "slate";
 export interface Retailer { id: RetailerId; name: string; shortName: string; tile: TileColour; website: string; }
 
 export type Category = "produce" | "dairy" | "bakery" | "pantry" | "meat" | "seafood" | "frozen" | "snacks" | "drinks" | "household";
 export type Unit = "kg" | "L" | "each" | "dozen";
+/** A unit as printed on a shelf tag. Converted to the item's Unit with shared/units.ts. */
+export type TagUnit = "g" | "kg" | "lb" | "oz" | "mL" | "L" | "each" | "dozen";
+/** The amount a printed price is for: { qty: 1, unit: "lb" } for "$1.27 /lb", { qty: 454, unit: "g" } for a 454 g pack. */
+export interface TagAmount { qty: number; unit: TagUnit }
 export type ArtKey =
   | "milk" | "eggs" | "butter" | "cheese" | "yogurt" | "sourcream" | "flour" | "bread" | "bagel"
   | "sugar" | "oats" | "pasta" | "rice" | "oil" | "jar" | "can" | "carton" | "banana" | "apple"
@@ -83,11 +87,12 @@ export interface ItemDetail { item: Item; history: PricePoint[]; stats: ItemStat
 
 export interface PriceCheckInput {
   itemId: string;
-  retailerId: RetailerId;
+  retailerId?: RetailerId;  // absent = "Other" store
   price: number;
   wasPrice?: number;
   multiBuy?: MultiBuy;
   sizeQty?: number;      // only if different from the item's current size
+  tagAmount?: TagAmount;  // the amount the price is for, as the user confirmed it (display only; sizeQty carries the converted size)
   source: "manual" | "scan" | "flyer";
 }
 
@@ -108,7 +113,7 @@ export interface Verdict {
   low90: number;         // unit
   high90: number;        // unit
   saleFreq12w: number;   // at the input store
-  best: { retailerId: RetailerId; price: number; unitPrice: number };  // cheapest current price among all stores
+  best: { retailerId?: RetailerId; price: number; unitPrice: number };  // cheapest current price among all stores
   tricks: TrickFlag[];
   dataPoints: number;
 }
@@ -132,6 +137,7 @@ export interface ScanResult {
   multiBuy?: MultiBuy;
   retailerId?: RetailerId;
   sizeQty?: number;
+  tagAmount?: TagAmount;  // the amount the scanned price is for, as printed
   rawText?: string;
   message?: string;
 }

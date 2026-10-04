@@ -1,14 +1,15 @@
 // DATA-04: complete mock API. Runs the shared engine in the browser against the seed store.
-import type { Api, DataStatus, Item, MultiBuy, PriceStore, RetailerId, ScanResult } from "@shared/types";
+import type { Api, DataStatus, Item, MultiBuy, PriceStore, RetailerId, ScanResult, TagAmount } from "@shared/types";
 import { checkPrice, generateSeedStore, getItemDetail, getNearbyPrices, searchItems } from "@shared/verdict";
 import { getFeaturedDeals } from "@shared/seed/featured";
 import { TRICKS } from "@shared/content/tricks";
 import { RETAILERS } from "@shared/retailers";
-import { getStoreItems, getStoreSummaries } from "@shared/stores";
+import { getStoreItems, getStoreSummaries, dropUnknownRetailers } from "@shared/stores";
 
 // Use the merged real-data store (data/prices.json from `npm run merge:data`) when it exists, else the seed store.
 const bundled = import.meta.glob("../../data/prices.json", { eager: true, import: "default" }) as Record<string, PriceStore>;
-const store: PriceStore = Object.values(bundled)[0] ?? generateSeedStore();
+const raw = Object.values(bundled)[0];
+const store: PriceStore = raw ? dropUnknownRetailers(raw) : generateSeedStore();
 
 const LATENCY_MS = 350;
 const SCAN_LATENCY_MS = 1800;
@@ -30,14 +31,15 @@ interface CannedScan {
   price: number;
   wasPrice?: number;
   multiBuy?: MultiBuy;
+  tagAmount?: TagAmount;
   sizeQty?: number;
   rawText?: string;
 }
 
 const SAMPLES: Record<string, CannedScan> = {
-  "sample-butter": { itemId: "butter-salted-454g", retailerId: "saveon", price: 5.99, wasPrice: 8.49 },
-  "sample-yogurt": { itemId: "greek-yogurt-plain", retailerId: "walmart", price: 5.97, sizeQty: 0.5 },
-  "sample-pasta": { itemId: "spaghetti-900g", retailerId: "tnt", price: 2.5, multiBuy: { qty: 2, total: 5 } },
+  "sample-butter": { itemId: "butter-salted-454g", retailerId: "saveon", price: 5.99, wasPrice: 8.49, tagAmount: { qty: 454, unit: "g" }, sizeQty: 0.454 },
+  "sample-yogurt": { itemId: "greek-yogurt-plain", retailerId: "walmart", price: 5.97, tagAmount: { qty: 500, unit: "g" }, sizeQty: 0.5 },
+  "sample-pasta": { itemId: "spaghetti-900g", retailerId: "tnt", price: 2.5, multiBuy: { qty: 2, total: 5 }, tagAmount: { qty: 900, unit: "g" }, sizeQty: 0.9 },
 };
 
 const DEFAULT_SCAN: CannedScan = {
@@ -65,6 +67,7 @@ function cannedScan(sampleId: string | undefined): ScanResult {
   };
   if (canned.wasPrice !== undefined) result.wasPrice = canned.wasPrice;
   if (canned.multiBuy) result.multiBuy = canned.multiBuy;
+  if (canned.tagAmount) result.tagAmount = canned.tagAmount;
   if (canned.sizeQty !== undefined) result.sizeQty = canned.sizeQty;
   if (canned.rawText) result.rawText = canned.rawText;
   return result;

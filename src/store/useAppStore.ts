@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { RETAILERS } from "@shared/retailers";
 import type { GeoPoint, RetailerId, Verdict } from "@shared/types";
 
 export interface UserLocation { point: GeoPoint; label: string; source: "gps" | "default" }
@@ -23,6 +24,19 @@ interface AppState {
   setLocation: (loc: UserLocation) => void;
 }
 
+/** v1 -> v2: Metro, Voila and Galleria were removed; drop anything that still points at them. */
+export function migrateAppState(persisted: unknown, version: number): unknown {
+  if (!persisted || typeof persisted !== "object" || version >= 2) return persisted;
+  const known = new Set<string>(RETAILERS.map((r) => r.id));
+  const ok = (id: unknown) => id === undefined || (typeof id === "string" && known.has(id));
+  const s = persisted as { hiddenStores?: unknown; recentChecks?: unknown };
+  const hiddenStores = Array.isArray(s.hiddenStores) ? s.hiddenStores.filter((id) => typeof id === "string" && known.has(id)) : [];
+  const recentChecks = Array.isArray(s.recentChecks)
+    ? s.recentChecks.filter((c: { input?: { retailerId?: unknown }; best?: { retailerId?: unknown } }) => ok(c?.input?.retailerId) && ok(c?.best?.retailerId))
+    : [];
+  return { ...s, hiddenStores, recentChecks };
+}
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -40,6 +54,6 @@ export const useAppStore = create<AppState>()(
       location: DEFAULT_LOCATION,
       setLocation: (location) => set({ location }),
     }),
-    { name: "realdeal", version: 1 },
+    { name: "realdeal", version: 2, migrate: (s, v) => migrateAppState(s, v) as AppState },
   ),
 );

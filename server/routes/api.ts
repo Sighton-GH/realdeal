@@ -132,8 +132,8 @@ apiRoute.post("/check", async (c) => {
     return c.json({ error: `Unknown or missing itemId: ${String(body.itemId)}` }, 400);
   }
 
-  // Validate retailerId
-  if (!body.retailerId || typeof body.retailerId !== "string" || !RETAILERS.some((r) => r.id === body.retailerId)) {
+  // Validate retailerId (optional; absent = "Other" store)
+  if (body.retailerId !== undefined && (typeof body.retailerId !== "string" || !RETAILERS.some((r) => r.id === body.retailerId))) {
     return c.json({ error: `Unknown or missing retailerId: ${String(body.retailerId)}` }, 400);
   }
 
@@ -166,6 +166,23 @@ apiRoute.post("/check", async (c) => {
     return c.json({ error: "sizeQty must be a positive number" }, 400);
   }
 
+  // Optional tagAmount
+  if (body.tagAmount !== undefined) {
+    const t = body.tagAmount as { qty?: unknown; unit?: unknown } | null;
+    const knownUnits = ["g", "kg", "lb", "oz", "mL", "L", "each", "dozen"];
+    if (
+      typeof t !== "object" ||
+      t === null ||
+      typeof t.qty !== "number" ||
+      !Number.isFinite(t.qty) ||
+      t.qty <= 0 ||
+      typeof t.unit !== "string" ||
+      !knownUnits.includes(t.unit)
+    ) {
+      return c.json({ error: "tagAmount must have a positive qty and a known unit" }, 400);
+    }
+  }
+
   // Optional source
   if (body.source !== undefined && !["manual", "scan", "flyer"].includes(body.source)) {
     return c.json({ error: "source must be 'manual', 'scan', or 'flyer'" }, 400);
@@ -178,6 +195,7 @@ apiRoute.post("/check", async (c) => {
     wasPrice: body.wasPrice,
     multiBuy: body.multiBuy,
     sizeQty: body.sizeQty,
+    tagAmount: body.tagAmount,
     source: body.source ?? "manual",
   };
 

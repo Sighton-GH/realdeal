@@ -1,8 +1,9 @@
 import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
 import { classifyGeminiError, cooldownMsFor, getKeyPool, type KeyPool } from "./geminiKeys";
 import { rankItems } from "../scrapers/match";
-import { parseMultiBuy, parsePrice, parseSize } from "../scrapers/parse";
-import type { PriceStore, RetailerId, ScanResult } from "../shared/types";
+import { parseMultiBuy, parsePrice } from "../scrapers/parse";
+import { parseTagAmount, sameAmount, toItemUnits } from "../shared/units";
+import type { PriceStore, RetailerId, ScanResult, TagAmount } from "../shared/types";
 
 export interface ScanImageInput {
   data: Buffer;
@@ -16,6 +17,7 @@ export interface RawGeminiExtraction {
   sizeText?: string | null;
   price?: number | null;
   wasPrice?: number | null;
+  priceUnitText?: string | null;
   multiBuyText?: string | null;
   unitPriceText?: string | null;
   storeName?: string | null;
@@ -28,6 +30,7 @@ const PROMPT =
   "Extract only what is printed. If several prices appear, price is what the shopper pays now for one unit; " +
   "a struck-out, 'was', or 'reg.' price goes in wasPrice; a multi-buy like '2 for $5' goes in multiBuyText. " +
   "A per-weight or per-volume line such as '$11.94 / KG', '$1.29/lb' or '$0.99/100g' is NEVER price or wasPrice: put it in unitPriceText. " +
+  "priceUnitText is what the main price is for, as printed beside it (a tag reading '$1.27 lb' has priceUnitText 'lb'); never take it from the per-kg or per-100 g line. " +
   "Only set wasPrice when the tag clearly shows a struck-out, 'was' or 'reg.' price. " +
   "Use null for anything not visible. Do not guess.";
 
@@ -66,6 +69,10 @@ const RESPONSE_SCHEMA = {
       type: Type.STRING,
       description: "Unit price text like '$1.29/lb' or '$0.99/100g', if printed.",
     },
+    priceUnitText: {
+      type: Type.STRING,
+      description: "The amount the main price is for, exactly as printed right next to it, e.g. 'lb', '/kg', 'ea', '100 g', '454 g'. Null if nothing is printed next to the price.",
+    },
     storeName: {
       type: Type.STRING,
       description: "Store name or chain printed on the tag, if visible.",
@@ -96,6 +103,8 @@ function handleSample(sampleId: string, store: PriceStore): ScanResult | null {
       candidates,
       price: 5.99,
       wasPrice: 8.49,
+      tagAmount: { qty: 454, unit: "g" },
+      sizeQty: 0.454,
       retailerId: "saveon",
     };
   }
@@ -110,6 +119,7 @@ function handleSample(sampleId: string, store: PriceStore): ScanResult | null {
       status: "ok",
       candidates,
       price: 5.97,
+      tagAmount: { qty: 500, unit: "g" },
       sizeQty: 0.5,
       retailerId: "walmart",
     };
@@ -126,6 +136,8 @@ function handleSample(sampleId: string, store: PriceStore): ScanResult | null {
       candidates,
       price: 2.5,
       multiBuy: { qty: 2, total: 5.0 },
+      tagAmount: { qty: 900, unit: "g" },
+      sizeQty: 0.9,
       retailerId: "tnt",
     };
   }
@@ -152,10 +164,20 @@ function mapRetailer(storeName?: string | null): RetailerId | undefined {
     return "tnt";
   }
   if (/\bloblaws?\b/.test(s)) return "loblaws";
-  if (/\bmetro\b/.test(s)) return "metro";
-  if (/\bvoila\b/.test(s)) return "voila";
-  if (/\bgalleria\b/.test(s)) return "galleria";
   return undefined;
+}
+
+/** The amount the price is for, worked out from the printed unit-price line: $1.27 with "$2.81 kg" is 1 lb. Weight only. */
+function amountFromUnitPrice(price: number, unitPriceText: string | null | undefined): TagAmount | undefined {
+  // parsePrice gives the number; parseTagAmount gives the unit ("$2.81 kg" has no slash, which parsePrice's `per` misses)
+  const upPrice = parsePrice(unitPriceText ?? "")?.price;
+  const upAmount = parseTagAmount(unitPriceText);
+  const upKg = upAmount ? toItemUnits(upAmount, "kg") : undefined;
+  if (!upPrice || !(upPrice > 0) || !upKg) return undefined;
+  const perKg = upPrice / upKg;
+  const kg = price / perKg;
+  const options: TagAmount[] = [{ qty: 1, unit: "lb" }, { qty: 1, unit: "kg" }, { qty: 100, unit: "g" }];
+  return options.find((o) => Math.abs((toItemUnits(o, "kg") ?? 0) - kg) / kg <= 0.03);
 }
 
 /**
@@ -210,32 +232,11 @@ export function postProcess(raw: RawGeminiExtraction, store: PriceStore): ScanRe
 
   const topItem = candidates[0];
 
-  // Adjust for per-lb produce pricing (e.g. bananas $0.77/lb -> ~$1.70/kg)
-  const isPerKgProduce =
-    topItem.unit === "kg" &&
-    (topItem.sizeLabel === "per kg" || (topItem.category === "produce" && topItem.sizeQty === 1));
-
-  const priceInfo = parsePrice(raw.unitPriceText ?? "") || parsePrice(raw.sizeText ?? "");
-  const hasPerLbIndicator =
-    priceInfo?.per === "lb" ||
-    /\/(?:lb)\b|\bper\s*lb\b/i.test(raw.unitPriceText ?? "") ||
-    /\/(?:lb)\b|\bper\s*lb\b/i.test(raw.sizeText ?? "");
-
-  if (isPerKgProduce && hasPerLbIndicator && price !== undefined) {
-    price = Math.round((price / 0.45359237) * 100) / 100;
-  }
-
-  // Parse package sizeQty (only if differs from item size by > 2%)
-  let sizeQty: number | undefined;
-  if (raw.sizeText) {
-    const parsedSize = parseSize(raw.sizeText);
-    if (parsedSize && parsedSize.unit === topItem.unit) {
-      const diffPct = Math.abs(parsedSize.qty - topItem.sizeQty) / topItem.sizeQty;
-      if (diffPct > 0.02) {
-        sizeQty = parsedSize.qty;
-      }
-    }
-  }
+  const fits = (a: TagAmount | undefined): a is TagAmount => a !== undefined && toItemUnits(a, topItem.unit) !== undefined;
+  const printed = [parseTagAmount(raw.priceUnitText), parseTagAmount(raw.sizeText)].filter(fits);
+  const cross = topItem.unit === "kg" ? amountFromUnitPrice(price, raw.unitPriceText) : undefined;
+  const tagAmount = cross ? (printed.find((a) => sameAmount(a, cross, topItem.unit)) ?? cross) : printed[0];
+  const sizeQty = tagAmount ? toItemUnits(tagAmount, topItem.unit) : undefined;
 
   // A "was" price must be higher than the price, and is not the per-kg/per-lb line the model sometimes mistakes it for
   let wasPrice = raw.wasPrice != null ? raw.wasPrice : undefined;
@@ -256,6 +257,7 @@ export function postProcess(raw: RawGeminiExtraction, store: PriceStore): ScanRe
     multiBuy: multiBuy ?? undefined,
     retailerId: mapRetailer(raw.storeName),
     sizeQty,
+    tagAmount,
     rawText: raw.rawText ?? undefined,
   };
 }

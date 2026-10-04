@@ -44,7 +44,7 @@ export function pennyLineFor(v: Verdict): string {
         : "That's just what it usually costs.";
       break;
     case "high":
-      line = v.best.retailerId !== v.input.retailerId
+      line = v.best.retailerId !== undefined && v.best.retailerId !== v.input.retailerId
         ? `Put it back. ${retailerById(v.best.retailerId).name} has it for ${formatMoney(v.best.price)}.`
         : "Put it back. You can do better.";
       break;

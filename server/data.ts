@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { generateSeedStore } from "../shared/seed/generate";
+import { dropUnknownRetailers } from "../shared/stores";
 import type { PriceStore } from "../shared/types";
 import { syncToTiger } from "./tiger";
 
@@ -29,8 +30,8 @@ function loadStoreFromFile(): boolean {
     const raw = fs.readFileSync(PRICES_PATH, "utf-8");
     const parsed = JSON.parse(raw);
     if (validatePriceStore(parsed)) {
-      currentStore = parsed;
-      console.log(`[Data] Loaded ${parsed.points.length} price points from ${PRICES_PATH}`);
+      currentStore = dropUnknownRetailers(parsed);
+      console.log(`[Data] Loaded ${currentStore.points.length} price points from ${PRICES_PATH}`);
       syncToTiger(currentStore).catch(() => {});
       return true;
     } else {

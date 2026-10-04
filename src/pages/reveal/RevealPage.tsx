@@ -32,7 +32,7 @@ function CloseButton({ onDark, className }: { onDark: boolean; className?: strin
 function RevealScene({ verdict }: { verdict: Verdict }) {
   const reduced = useReducedMotion() ?? false;
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { phase, suspicious, runId, skip, replay } = useRevealSequence(verdict, reduced, canvasRef);
+  const { phase, suspicious, runId, skip } = useRevealSequence(verdict, reduced, canvasRef);
   const meta = tierMeta[verdict.tier];
   const shake = !reduced && verdict.tier === "high" && phase === "slam";
   const revealed = phase === "slam" || phase === "result";
@@ -55,7 +55,7 @@ function RevealScene({ verdict }: { verdict: Verdict }) {
             animate={reduced ? { opacity: 1 } : { y: 0 }}
             transition={reduced ? { duration: 0.15 } : spring.sheet}
           >
-            <RevealResult verdict={verdict} onReplay={replay} />
+            <RevealResult verdict={verdict} />
           </motion.div>
         )}
       </motion.div>
