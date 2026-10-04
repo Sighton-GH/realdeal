@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generateSeedStore } from "../shared/seed/generate";
 import { postProcess, scanWithGemini } from "./scan";
+import { KeyPool } from "./geminiKeys";
 
 describe("postProcess", () => {
   const store = generateSeedStore();
@@ -165,5 +166,150 @@ describe("postProcess: guards against mis-read 'was' prices", () => {
   it("keeps a genuine struck-out 'was' price", () => {
     const r = postProcess({ isPriceTag: true, productName: "Salted Butter", sizeText: "454 g", price: 5.99, wasPrice: 8.49, unitPriceText: "$13.19 / KG" }, store);
     expect(r.wasPrice).toBe(8.49);
+  });
+});
+
+describe("scanWithGemini key rotation", () => {
+  const store = generateSeedStore();
+  const image = { data: Buffer.from("fake"), mimeType: "image/png" };
+  const K = (n: number) => `AQ.rotationkey${n}_abcdefghijklmnopqrstuv`;
+  const tag = JSON.stringify({ isPriceTag: true, productName: "Salted Butter", sizeText: "454 g", price: 5.99, wasPrice: 8.49 });
+  const limited = () => new Error('{"error":{"code":429,"message":"Quota exceeded. Please retry in 30s.","status":"RESOURCE_EXHAUSTED"}}');
+  const invalid = () => new Error('{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT"}}');
+  const noSleep = async () => {};
+
+  it("moves to the next key when one is rate limited, and rests the first", async () => {
+    const used: string[] = [];
+    const pool = new KeyPool([K(1), K(2), K(3)]);
+    const r = await scanWithGemini(image, undefined, store, {
+      pool, sleep: noSleep,
+      generate: async (key) => { used.push(key); if (key === K(1)) throw limited(); return tag; },
+    });
+    expect(r.status).toBe("ok");
+    expect(r.candidates[0].id).toBe("butter-salted-454g");
+    expect(used).toEqual([K(1), K(2)]);
+    expect(pool.status()[0].state).toBe("cooling");
+    expect(pool.status()[1].state).toBe("ready");
+  });
+
+  it("keeps skipping the rested key on the next scans", async () => {
+    const used: string[] = [];
+    const pool = new KeyPool([K(1), K(2)]);
+    const generate = async (key: string) => { used.push(key); if (key === K(1)) throw limited(); return tag; };
+    await scanWithGemini(image, undefined, store, { pool, sleep: noSleep, generate });
+    await scanWithGemini(image, undefined, store, { pool, sleep: noSleep, generate });
+    await scanWithGemini(image, undefined, store, { pool, sleep: noSleep, generate });
+    expect(used).toEqual([K(1), K(2), K(2), K(2)]); // K(1) tried once, then rested
+  });
+
+  it("spreads scans across keys when none are limited", async () => {
+    const used: string[] = [];
+    const pool = new KeyPool([K(1), K(2), K(3)]);
+    const generate = async (key: string) => { used.push(key); return tag; };
+    for (let i = 0; i < 6; i++) await scanWithGemini(image, undefined, store, { pool, sleep: noSleep, generate });
+    expect(used).toEqual([K(1), K(2), K(3), K(1), K(2), K(3)]);
+  });
+
+  it("switches off a key Google rejects and carries on", async () => {
+    const pool = new KeyPool([K(1), K(2)]);
+    const r = await scanWithGemini(image, undefined, store, {
+      pool, sleep: noSleep, generate: async (key) => { if (key === K(1)) throw invalid(); return tag; },
+    });
+    expect(r.status).toBe("ok");
+    expect(pool.status()[0].state).toBe("disabled");
+  });
+
+  it("when every key is limited, answers with a friendly wait time and stops calling Google", async () => {
+    let calls = 0;
+    const pool = new KeyPool([K(1), K(2)]);
+    const generate = async () => { calls++; throw limited(); };
+    const r = await scanWithGemini(image, undefined, store, { pool, sleep: noSleep, generate });
+    expect(r.status).toBe("error");
+    expect(r.message).toMatch(/Try again in \d+ seconds/);
+    expect(calls).toBe(2); // each key tried once
+    const again = await scanWithGemini(image, undefined, store, { pool, sleep: noSleep, generate });
+    expect(again.message).toMatch(/Try again in \d+ seconds/);
+    expect(calls).toBe(2); // keys are resting: no new calls
+  });
+
+  it("retries a 503 once, then succeeds", async () => {
+    let calls = 0;
+    const pool = new KeyPool([K(1)]);
+    const r = await scanWithGemini(image, undefined, store, {
+      pool, sleep: noSleep,
+      generate: async () => { calls++; if (calls === 1) throw new Error('{"error":{"code":503,"message":"high demand"}}'); return tag; },
+    });
+    expect(r.status).toBe("ok");
+    expect(calls).toBe(2);
+  });
+
+  it("does not rotate on an ordinary failure", async () => {
+    let calls = 0;
+    const pool = new KeyPool([K(1), K(2)]);
+    const r = await scanWithGemini(image, undefined, store, {
+      pool, sleep: noSleep, generate: async () => { calls++; throw new Error("socket hang up"); },
+    });
+    expect(r.message).toBe("Couldn't read that photo right now.");
+    expect(calls).toBe(1);
+  });
+
+  it("says scanning is not set up when there are no keys", async () => {
+    const r = await scanWithGemini(image, undefined, store, { pool: new KeyPool([]), sleep: noSleep, generate: async () => tag });
+    expect(r.message).toBe("Scanning isn't set up on this server.");
+  });
+});
+
+describe("postProcess: model noise", () => {
+  const store = generateSeedStore();
+  it("matches on the product name, not a junk 'brand' field", () => {
+    const r = postProcess({ isPriceTag: true, productName: "PLAIN GREEK YOGURT", brand: "SALTED BUTTER EVERYDAY PRICE", sizeText: "500 G", price: 5.97 }, store);
+    expect(r.candidates[0].id).toBe("greek-yogurt-plain");
+  });
+  it("falls back to the full transcript when the name matches nothing", () => {
+    const r = postProcess({ isPriceTag: true, productName: "XYZ", rawText: "SALTED BUTTER 454 G $5.99", sizeText: "454 G", price: 5.99 }, store);
+    expect(r.candidates[0].id).toBe("butter-salted-454g");
+  });
+  it("drops an invented 'was' price that is not in the transcript, keeps a printed one", () => {
+    const base = { isPriceTag: true, productName: "Salted Butter", sizeText: "454 g", price: 5.99 };
+    expect(postProcess({ ...base, wasPrice: 8.49, rawText: "SALTED BUTTER 454G WAS $8.49 $5.99" }, store).wasPrice).toBe(8.49);
+    expect(postProcess({ ...base, wasPrice: 7.29, rawText: "SALTED BUTTER 454G $5.99" }, store).wasPrice).toBeUndefined();
+  });
+});
+
+describe("scanWithGemini 503 spikes", () => {
+  const store = generateSeedStore();
+  it("survives two 503s in a row", async () => {
+    let calls = 0;
+    const r = await scanWithGemini({ data: Buffer.from("x"), mimeType: "image/png" }, undefined, store, {
+      pool: new KeyPool(["AQ.spikekey_abcdefghijklmnopqrstuvwx"]), sleep: async () => {},
+      generate: async () => { calls++; if (calls < 3) throw new Error('{"error":{"code":503,"message":"high demand"}}'); return JSON.stringify({ isPriceTag: true, productName: "Salted Butter", sizeText: "454 g", price: 5.99 }); },
+    });
+    expect(r.status).toBe("ok");
+    expect(calls).toBe(3);
+  });
+  it("gives up after the retries", async () => {
+    let calls = 0;
+    const r = await scanWithGemini({ data: Buffer.from("x"), mimeType: "image/png" }, undefined, store, {
+      pool: new KeyPool(["AQ.spikekey_abcdefghijklmnopqrstuvwx"]), sleep: async () => {},
+      generate: async () => { calls++; throw new Error('{"error":{"code":503,"message":"high demand"}}'); },
+    });
+    expect(r.status).toBe("error");
+    expect(calls).toBe(3);
+  });
+});
+
+describe("postProcess: invented multi-buy", () => {
+  const store = generateSeedStore();
+  const base = { isPriceTag: true, productName: "Salted Butter", sizeText: "454 g", price: 5.99 };
+  it("drops a multi-buy that is not in the transcript", () => {
+    const r = postProcess({ ...base, multiBuyText: "2 for $5.00", rawText: "SALTED BUTTER 454 G WAS $8.49 $5.99" }, store);
+    expect(r.multiBuy).toBeUndefined();
+  });
+  it("keeps a multi-buy the transcript confirms", () => {
+    const r = postProcess({ ...base, productName: "Spaghetti", sizeText: "900 g", price: 2.5, multiBuyText: "2 for $5.00", rawText: "SPAGHETTI 900 G 2 FOR $5.00" }, store);
+    expect(r.multiBuy).toEqual({ qty: 2, total: 5 });
+  });
+  it("keeps it when there is no transcript to check against", () => {
+    expect(postProcess({ ...base, multiBuyText: "2 for $5.00" }, store).multiBuy).toEqual({ qty: 2, total: 5 });
   });
 });

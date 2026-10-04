@@ -1,4 +1,5 @@
 import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
+import { classifyGeminiError, cooldownMsFor, getKeyPool, type KeyPool } from "./geminiKeys";
 import { rankItems } from "../scrapers/match";
 import { parseMultiBuy, parsePrice, parseSize } from "../scrapers/parse";
 import type { PriceStore, RetailerId, ScanResult } from "../shared/types";
@@ -157,8 +158,12 @@ function mapRetailer(storeName?: string | null): RetailerId | undefined {
  * Post-processes the raw extraction from Gemini into a catalogue-matched ScanResult.
  */
 export function postProcess(raw: RawGeminiExtraction, store: PriceStore): ScanResult {
-  const fullText = [raw.productName, raw.brand].filter(Boolean).join(" ");
-  const candidates = fullText ? rankItems(store.items, fullText, raw.sizeText ?? undefined, 3) : [];
+  // Match on the product name only: our catalogue is brand-agnostic and the model's "brand" field is often
+  // a barcode or a slogan ("EVERYDAY PRICE") that would pull the match to the wrong item.
+  // If the name gives nothing, fall back to everything the model transcribed.
+  const productName = (raw.productName ?? "").trim();
+  let candidates = productName ? rankItems(store.items, productName, raw.sizeText ?? undefined, 3) : [];
+  if (candidates.length === 0 && raw.rawText) candidates = rankItems(store.items, raw.rawText, raw.sizeText ?? undefined, 3);
 
   // If not a price tag or no product found
   if (raw.isPriceTag === false) {
@@ -179,7 +184,12 @@ export function postProcess(raw: RawGeminiExtraction, store: PriceStore): ScanRe
     };
   }
 
-  const multiBuy = raw.multiBuyText ? parseMultiBuy(raw.multiBuyText) : undefined;
+  // A multi-buy the model reports must also read the same in its transcript of the tag (it has invented "2 for $5" on tags without one)
+  let multiBuy = raw.multiBuyText ? parseMultiBuy(raw.multiBuyText) : undefined;
+  if (multiBuy && raw.rawText) {
+    const fromTranscript = parseMultiBuy(raw.rawText);
+    if (!fromTranscript || fromTranscript.qty !== multiBuy.qty || Math.abs(fromTranscript.total - multiBuy.total) > 0.005) multiBuy = undefined;
+  }
   let price = raw.price != null ? raw.price : undefined;
   if (price === undefined && multiBuy) {
     price = multiBuy.total / multiBuy.qty;
@@ -229,6 +239,10 @@ export function postProcess(raw: RawGeminiExtraction, store: PriceStore): ScanRe
   if (wasPrice !== undefined && (wasPrice <= price || (unitLine !== undefined && Math.abs(wasPrice - unitLine) < 0.005))) {
     wasPrice = undefined;
   }
+  // The model sometimes invents a "was" price (seen: 1.29, 0). A real one is printed on the tag, so it must be in the transcript.
+  if (wasPrice !== undefined && raw.rawText && !raw.rawText.replace(/[\s,]/g, "").includes(wasPrice.toFixed(2))) {
+    wasPrice = undefined;
+  }
 
   return {
     status: "ok",
@@ -245,10 +259,93 @@ export function postProcess(raw: RawGeminiExtraction, store: PriceStore): ScanRe
 /**
  * Reads a shelf tag image with Gemini Flash and returns a ScanResult matched to the catalogue.
  */
+/** One Gemini call with a specific key. Returns the model's JSON text. */
+export async function generateWithKey(apiKey: string, modelName: string, image: ScanImageInput): Promise<string | undefined> {
+  const ai = new GoogleGenAI({ apiKey });
+  const response = await ai.models.generateContent({
+    model: modelName,
+    contents: [
+      { inlineData: { data: image.data.toString("base64"), mimeType: image.mimeType } },
+      { text: PROMPT },
+    ],
+    config: {
+      temperature: 0,
+      // Reading printed text needs little deliberation; MINIMAL is rejected by this model, LOW is the lowest it accepts
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA,
+    },
+  });
+  return response.text;
+}
+
+export interface ScanDeps {
+  /** replace the network call (tests) */
+  generate?: (apiKey: string, modelName: string, image: ScanImageInput) => Promise<string | undefined>;
+  /** replace the shared key pool (tests) */
+  pool?: KeyPool;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+class AllKeysBusy extends Error {
+  constructor(readonly waitMs: number | null) {
+    super("All Gemini API keys are rate limited or unusable");
+  }
+}
+
+/**
+ * Runs the call on the next healthy key. A rate-limited key is benched (for Google's suggested wait) and the
+ * request moves on to the next key at once; an invalid key is switched off; a 503 gets two short retries.
+ */
+async function callWithRotation(
+  pool: KeyPool,
+  modelName: string,
+  image: ScanImageInput,
+  generate: NonNullable<ScanDeps["generate"]>,
+  sleep: (ms: number) => Promise<void>,
+): Promise<string | undefined> {
+  let retries503 = 0;
+  // at most one pass over every key, plus the 503 retries
+  for (let attempt = 0; attempt < pool.size + 2; attempt++) {
+    const slot = pool.acquire();
+    if (!slot) throw new AllKeysBusy(pool.waitMs());
+    try {
+      return await generate(slot.key, modelName, image);
+    } catch (err) {
+      const kind = classifyGeminiError(err);
+      if (kind === "rate_limit") {
+        const ms = cooldownMsFor(err);
+        pool.bench(slot, ms);
+        console.warn(`[Gemini] key ${slot.label} rate limited, resting ${Math.round(ms / 1000)}s; trying the next key`);
+        continue;
+      }
+      if (kind === "bad_key") {
+        pool.disable(slot);
+        console.warn(`[Gemini] key ${slot.label} was rejected (invalid, expired or not allowed); switched off for this run`);
+        continue;
+      }
+      if (kind === "unavailable" && retries503 < 2) {
+        retries503++;
+        await sleep(retries503 * 1200); // Google's "high demand" spikes are short: 1.2s, then 2.4s
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new AllKeysBusy(pool.waitMs());
+}
+
+/**
+ * Reads a shelf tag image with Gemini Flash and returns a ScanResult matched to the catalogue.
+ * Keys rotate automatically (see server/geminiKeys.ts); `deps` is only for tests.
+ */
 export async function scanWithGemini(
   image: ScanImageInput | null,
   sampleId: string | undefined,
   store: PriceStore,
+  deps: ScanDeps = {},
 ): Promise<ScanResult> {
   // Check samples first (no API call needed)
   if (sampleId) {
@@ -266,8 +363,8 @@ export async function scanWithGemini(
     };
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  const pool = deps.pool ?? getKeyPool();
+  if (pool.size === 0) {
     return {
       status: "error",
       candidates: [],
@@ -276,47 +373,16 @@ export async function scanWithGemini(
   }
 
   const modelName = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+  const generate = deps.generate ?? generateWithKey;
+  const sleep = deps.sleep ?? defaultSleep;
 
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const ai = new GoogleGenAI({ apiKey });
-
-    let timer: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timer = setTimeout(() => reject(new Error("Gemini scan timed out after 25s")), 25_000);
     });
 
-    const request = () => ai.models.generateContent({
-      model: modelName,
-      contents: [
-        {
-          inlineData: {
-            data: image.data.toString("base64"),
-            mimeType: image.mimeType,
-          },
-        },
-        {
-          text: PROMPT,
-        },
-      ],
-      config: {
-        temperature: 0,
-        // Reading printed text needs little deliberation; MINIMAL is rejected by this model, LOW is the lowest it accepts
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        responseMimeType: "application/json",
-        responseSchema: RESPONSE_SCHEMA,
-      },
-    });
-
-    // Google answers 503 "high demand" in short spikes: one quick retry covers most of them
-    const callPromise = request().catch(async (err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!/\b503\b|UNAVAILABLE|high demand/i.test(msg)) throw err;
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      return request();
-    });
-
-    const response = await Promise.race([callPromise, timeoutPromise]).finally(() => clearTimeout(timer));
-    const responseText = response.text;
+    const responseText = await Promise.race([callWithRotation(pool, modelName, image, generate, sleep), timeoutPromise]);
     if (!responseText) {
       return {
         status: "error",
@@ -328,16 +394,27 @@ export async function scanWithGemini(
     const raw = JSON.parse(responseText) as RawGeminiExtraction;
     return postProcess(raw, store);
   } catch (err) {
-    // Log a short line (never the key or the whole error payload)
+    if (err instanceof AllKeysBusy) {
+      const seconds = err.waitMs === null ? null : Math.max(1, Math.ceil(err.waitMs / 1000));
+      console.error(`[scanWithGemini] No usable Gemini key right now (${JSON.stringify(pool.status())})`);
+      return {
+        status: "error",
+        candidates: [],
+        message:
+          seconds === null
+            ? "Scanning isn't working on this server right now. Pick a sample tag or type the price."
+            : `Penny is getting a lot of scans right now. Try again in ${seconds <= 90 ? `${seconds} seconds` : "a few minutes"}, or pick a sample tag.`,
+      };
+    }
+    // Log a short line (never a key or the whole error payload)
     const errMsg = err instanceof Error ? err.message : String(err);
-    const rateLimited = /\b429\b|RESOURCE_EXHAUSTED|quota/i.test(errMsg);
-    console.error(`[scanWithGemini] ${rateLimited ? "Rate limited by Gemini (free tier is about 5 requests a minute)" : "Failed to process image"}: ${errMsg.slice(0, 160)}`);
+    console.error(`[scanWithGemini] Failed to process image: ${errMsg.slice(0, 160)}`);
     return {
       status: "error",
       candidates: [],
-      message: rateLimited
-        ? "Penny is getting a lot of scans right now. Try again in a minute, or pick a sample tag."
-        : "Couldn't read that photo right now.",
+      message: "Couldn't read that photo right now.",
     };
+  } finally {
+    clearTimeout(timer);
   }
 }
