@@ -3,15 +3,15 @@ import { motion } from "motion/react";
 import type { Verdict } from "@shared/types";
 import { NearbyPrices, SpeakButton, TrickCard } from "@/components/domain";
 import { PennyFace } from "@/components/penny";
-import { Button, LinkButton, Section, SpeechBubble } from "@/components/ui";
+import { LinkButton, Section, SpeechBubble } from "@/components/ui";
 import { pennyLineFor, tierMeta } from "@/lib/tier";
 import { CheaperElsewhere, hasCheaperElsewhere } from "./result/CheaperElsewhere";
 import { HistorySection } from "./result/HistorySection";
 import { NumbersCard } from "./result/NumbersCard";
 
-export interface RevealResultProps { verdict: Verdict; onReplay: () => void }
+export interface RevealResultProps { verdict: Verdict }
 
-export function RevealResult({ verdict, onReplay }: RevealResultProps) {
+export function RevealResult({ verdict }: RevealResultProps) {
   const line = pennyLineFor(verdict);
   const itemId = verdict.item.id;
   return (
@@ -54,7 +54,6 @@ export function RevealResult({ verdict, onReplay }: RevealResultProps) {
         <div className="flex flex-col gap-3">
           <LinkButton to="/check" fullWidth>Check another</LinkButton>
           <LinkButton to={"/item/" + itemId} variant="secondary" fullWidth>See price history</LinkButton>
-          <Button variant="ghost" fullWidth onClick={onReplay}>Replay</Button>
         </div>
       </motion.div>
     </div>
