@@ -6,7 +6,7 @@ import type { PriceCheckInput, PricePoint, RetailerId } from "./types";
 import { BUTTER, DATES, LATEST, MILK, PASTA, YOGURT, buildFixtureStore } from "./engine/fixtures";
 
 const store = buildFixtureStore();
-const input = (over: Partial<PriceCheckInput> & Pick<PriceCheckInput, "itemId" | "retailerId" | "price">): PriceCheckInput => ({
+const input = (over: Partial<PriceCheckInput> & Pick<PriceCheckInput, "itemId" | "price">): PriceCheckInput => ({
   source: "manual", ...over,
 });
 const trickTypes = (v: { tricks: { type: string }[] }) => v.tricks.map((t) => t.type);
@@ -287,6 +287,31 @@ describe("searchItems", () => {
   it("filters by category and returns nothing for no match", () => {
     expect(searchItems(store, "", "pantry").map((i) => i.id)).toEqual([PASTA.id]);
     expect(searchItems(store, "zzz")).toEqual([]);
+  });
+});
+
+describe("checkPrice with an Other store", () => {
+  it("compares against the all-store average and skips store history", () => {
+    const v = checkPrice(store, input({ itemId: BUTTER.id, price: 5.99, wasPrice: 50, source: "scan" }));
+    expect(v.input.retailerId).toBeUndefined();
+    expect(v.saleFreq12w).toBe(0);
+    expect(v.avgUnitPrice).toBeGreaterThan(0);
+    expect(v.tricks.map((t) => t.type)).not.toContain("perpetual_sale");
+    expect(v.tricks.map((t) => t.type)).not.toContain("inflated_was_price");
+  });
+  it("reports the user's price as best with no retailer when it is cheapest", () => {
+    const v = checkPrice(store, input({ itemId: BUTTER.id, price: 0.5, source: "scan" }));
+    expect(v.best.retailerId).toBeUndefined();
+    expect(v.best.price).toBe(0.5);
+  });
+  it("names a chain as best when one is cheaper", () => {
+    const v = checkPrice(store, input({ itemId: BUTTER.id, price: 99, source: "scan" }));
+    expect(v.best.retailerId).toBeDefined();
+  });
+  it("uses sizeQty from a tag amount", () => {
+    const v = checkPrice(store, input({ itemId: BUTTER.id, retailerId: "saveon", price: 1.27, sizeQty: 0.45359237, tagAmount: { qty: 1, unit: "lb" }, source: "scan" }));
+    expect(v.unitPrice).toBeCloseTo(2.7999, 3);
+    expect(v.input.tagAmount).toEqual({ qty: 1, unit: "lb" });
   });
 });
 
