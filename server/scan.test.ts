@@ -395,9 +395,9 @@ describe("scan store-name coverage", () => {
     ["NoFrills", "nofrills"], ["No Frills", "nofrills"],
     ["Walmart Canada", "walmart"], ["T&T Supermarket", "tnt"],
     ["TandT", "tnt"], ["T and T", "tnt"],
-    ["Loblaws", "loblaws"], ["Metro", "metro"],
-    ["Voilà by Sobeys", "voila"], ["Voila", "voila"],
-    ["Galleria Supermarket", "galleria"],
+    ["Loblaws", "loblaws"], ["Metro", undefined],
+    ["Voilà by Sobeys", undefined], ["Voila", undefined],
+    ["Galleria Supermarket", undefined],
     ["Unknown Grocer", undefined], ["Metropolitan Grocer", undefined],
   ])("recognizes %s without guessing an unknown chain", (storeName, retailerId) => {
     const result = postProcess({ productName: "Salted Butter", sizeText: "454 g", price: 5.99, storeName }, store);

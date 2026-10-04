@@ -42,9 +42,6 @@ function mapVendor(vendorStr: string): RetailerId | null {
   if (s.includes("walmart")) return "walmart";
   if (s.includes("t&t") || s.includes("t & t") || s.includes("tnt") || s.includes("tandt")) return "tnt";
   if (s.includes("loblaws")) return "loblaws";
-  if (s.includes("metro")) return "metro";
-  if (s.includes("voila")) return "voila";
-  if (s.includes("galleria")) return "galleria";
   return null;
 }
 
@@ -90,7 +87,7 @@ async function run(): Promise<void> {
   console.log(`[Hammer Import] Found price file: ${priceFile}`);
 
   const overrides = new Map<RetailerId, HammerOverrides>();
-  for (const retailer of ["saveon", "nofrills", "walmart", "tnt", "loblaws", "metro", "voila", "galleria"] as RetailerId[]) {
+  for (const retailer of ["saveon", "nofrills", "walmart", "tnt", "loblaws"] as RetailerId[]) {
     const file = path.resolve("data/overrides", `${retailer}.json`);
     if (fs.existsSync(file)) overrides.set(retailer, JSON.parse(fs.readFileSync(file, "utf8")) as HammerOverrides);
   }

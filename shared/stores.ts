@@ -53,3 +53,13 @@ export function getStoreItems(store: PriceStore, retailerId: RetailerId): StoreI
   }
   return rows.sort((a, b) => a.item.category.localeCompare(b.item.category) || a.item.name.localeCompare(b.item.name));
 }
+
+/** Drops points and locations for chains no longer in RETAILERS (a stale data/prices.json can still have them). */
+export function dropUnknownRetailers(store: PriceStore): PriceStore {
+  const known = new Set<string>(RETAILERS.map((r) => r.id));
+  return {
+    ...store,
+    points: store.points.filter((p) => known.has(p.retailerId)),
+    locations: store.locations.filter((l) => known.has(l.retailerId)),
+  };
+}

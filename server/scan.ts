@@ -152,9 +152,6 @@ function mapRetailer(storeName?: string | null): RetailerId | undefined {
     return "tnt";
   }
   if (/\bloblaws?\b/.test(s)) return "loblaws";
-  if (/\bmetro\b/.test(s)) return "metro";
-  if (/\bvoila\b/.test(s)) return "voila";
-  if (/\bgalleria\b/.test(s)) return "galleria";
   return undefined;
 }
 

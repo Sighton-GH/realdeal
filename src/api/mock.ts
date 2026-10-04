@@ -4,11 +4,12 @@ import { checkPrice, generateSeedStore, getItemDetail, getNearbyPrices, searchIt
 import { getFeaturedDeals } from "@shared/seed/featured";
 import { TRICKS } from "@shared/content/tricks";
 import { RETAILERS } from "@shared/retailers";
-import { getStoreItems, getStoreSummaries } from "@shared/stores";
+import { getStoreItems, getStoreSummaries, dropUnknownRetailers } from "@shared/stores";
 
 // Use the merged real-data store (data/prices.json from `npm run merge:data`) when it exists, else the seed store.
 const bundled = import.meta.glob("../../data/prices.json", { eager: true, import: "default" }) as Record<string, PriceStore>;
-const store: PriceStore = Object.values(bundled)[0] ?? generateSeedStore();
+const raw = Object.values(bundled)[0];
+const store: PriceStore = raw ? dropUnknownRetailers(raw) : generateSeedStore();
 
 const LATENCY_MS = 350;
 const SCAN_LATENCY_MS = 1800;
