@@ -196,6 +196,8 @@ export function ScanPage() {
           guide={guide}
           torchSupported={camera.torchSupported}
           torchOn={camera.torchOn}
+          focusSupported={camera.focusSupported}
+          onFocusAt={(p) => void camera.focusAt(p)}
           onToggleTorch={() => void camera.toggleTorch()}
           onClose={close}
           onShutter={() => void onShutter()}
