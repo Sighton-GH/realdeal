@@ -26,7 +26,8 @@ describe("postProcess", () => {
     expect(res.price).toBe(5.99);
     expect(res.wasPrice).toBe(8.49);
     expect(res.retailerId).toBe("saveon");
-    expect(res.sizeQty).toBeUndefined(); // exactly matches 454g, so not set
+    expect(res.sizeQty).toBeCloseTo(0.454, 6);
+    expect(res.tagAmount).toEqual({ qty: 454, unit: "g" });
   });
 
   it("handles a multi-buy pasta tag", () => {
@@ -76,11 +77,12 @@ describe("postProcess", () => {
     expect(res.message).toBe("Penny read the tag but couldn't match the product.");
   });
 
-  it("handles a per-lb produce tag and converts price to per-kg", () => {
+  it("handles a per-lb produce tag and keeps the printed price with its unit", () => {
     const raw = {
       isPriceTag: true,
       productName: "Bananas",
       price: 0.77,
+      priceUnitText: "lb",
       unitPriceText: "$0.77/lb",
       sizeText: "per lb",
       storeName: "No Frills",
@@ -92,8 +94,53 @@ describe("postProcess", () => {
     expect(res.status).toBe("ok");
     expect(res.candidates[0].id).toBe("bananas-kg");
     expect(res.retailerId).toBe("nofrills");
-    // $0.77 / 0.45359237 =~ $1.70/kg
-    expect(res.price).toBeCloseTo(1.7, 1);
+    expect(res.price).toBe(0.77);
+    expect(res.tagAmount).toEqual({ qty: 1, unit: "lb" });
+  });
+
+  it("reads a per-lb produce tag even when the kg line is in unitPriceText (plantain tag)", () => {
+    const res = postProcess({
+      isPriceTag: true, productName: "Banana Plantain", price: 1.27, priceUnitText: "lb",
+      unitPriceText: "$2.81 kg", rawText: "Banana Plantain $1.27 lb/ $2.81 kg 4235 50292092 01/18/2026",
+    }, store);
+    expect(res.status).toBe("ok");
+    expect(res.price).toBe(1.27);
+    expect(res.tagAmount).toEqual({ qty: 1, unit: "lb" });
+    expect(res.sizeQty).toBeCloseTo(0.45359237, 6);
+  });
+
+  it("works out per lb from the kg line when the model gives no priceUnitText", () => {
+    const res = postProcess({
+      isPriceTag: true, productName: "Banana Plantain", price: 1.27, unitPriceText: "$2.81 kg",
+      rawText: "Banana Plantain $1.27 lb/ $2.81 kg",
+    }, store);
+    expect(res.tagAmount).toEqual({ qty: 1, unit: "lb" });
+    expect(res.price).toBe(1.27);
+  });
+
+  it("prefers the cross-check when the model's priceUnitText disagrees with the printed unit price", () => {
+    const res = postProcess({
+      isPriceTag: true, productName: "Bananas", price: 1.27, priceUnitText: "kg", unitPriceText: "$2.81/kg",
+      rawText: "Bananas $1.27 lb $2.81/kg",
+    }, store);
+    expect(res.tagAmount).toEqual({ qty: 1, unit: "lb" });
+  });
+
+  it("keeps a printed package size that agrees with the cross-check", () => {
+    const res = postProcess({
+      isPriceTag: true, productName: "Salted Butter", sizeText: "454 g", price: 5.99, unitPriceText: "$1.32/100g",
+      rawText: "Salted Butter 454 g $5.99 $1.32/100g",
+    }, store);
+    expect(res.tagAmount).toEqual({ qty: 454, unit: "g" });
+    expect(res.sizeQty).toBeCloseTo(0.454, 6);
+  });
+
+  it("ignores a tag amount whose unit does not fit the matched item", () => {
+    const res = postProcess({
+      isPriceTag: true, productName: "Salted Butter", sizeText: "1 L", price: 5.99, rawText: "Salted Butter 1 L $5.99",
+    }, store);
+    expect(res.tagAmount).toBeUndefined();
+    expect(res.sizeQty).toBeUndefined();
   });
 });
 

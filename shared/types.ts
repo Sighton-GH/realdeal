@@ -137,6 +137,7 @@ export interface ScanResult {
   multiBuy?: MultiBuy;
   retailerId?: RetailerId;
   sizeQty?: number;
+  tagAmount?: TagAmount;  // the amount the scanned price is for, as printed
   rawText?: string;
   message?: string;
 }
