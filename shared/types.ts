@@ -87,11 +87,12 @@ export interface ItemDetail { item: Item; history: PricePoint[]; stats: ItemStat
 
 export interface PriceCheckInput {
   itemId: string;
-  retailerId: RetailerId;
+  retailerId?: RetailerId;  // absent = "Other" store
   price: number;
   wasPrice?: number;
   multiBuy?: MultiBuy;
   sizeQty?: number;      // only if different from the item's current size
+  tagAmount?: TagAmount;  // the amount the price is for, as the user confirmed it (display only; sizeQty carries the converted size)
   source: "manual" | "scan" | "flyer";
 }
 
@@ -112,7 +113,7 @@ export interface Verdict {
   low90: number;         // unit
   high90: number;        // unit
   saleFreq12w: number;   // at the input store
-  best: { retailerId: RetailerId; price: number; unitPrice: number };  // cheapest current price among all stores
+  best: { retailerId?: RetailerId; price: number; unitPrice: number };  // cheapest current price among all stores
   tricks: TrickFlag[];
   dataPoints: number;
 }
