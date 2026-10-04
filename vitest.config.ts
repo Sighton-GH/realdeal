@@ -8,5 +8,5 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
-  test: { include: ["shared/**/*.test.ts", "scrapers/**/*.test.ts", "server/**/*.test.ts"], environment: "node" },
+  test: { include: ["shared/**/*.test.ts", "scrapers/**/*.test.ts", "server/**/*.test.ts", "src/**/*.test.ts"], environment: "node" },
 });
