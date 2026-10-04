@@ -216,22 +216,20 @@ export function ScanConfirmSheet({ open, result, onRetake, onClose }: ScanConfir
             <h3 className="text-h3">On the tag</h3>
             {editing === "tag" ? (
               <div className="flex flex-col gap-3">
-                <div className="flex items-end gap-3">
-                  <div className="flex-1">
-                    <TextField label="Price" value={price} onChange={(v) => patch({ price: v })} inputMode="decimal" prefix="$" placeholder="0.00" />
-                  </div>
-                  <div className="flex-1">
+                <div className="min-w-0">
+                  <TextField label="Price" value={price} onChange={(v) => patch({ price: v })} inputMode="decimal" prefix="$" placeholder="0.00" />
+                </div>
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="w-28 shrink-0">
                     <TextField label="Amount" value={amountText} onChange={setAmountText} inputMode="decimal" />
                   </div>
-                  {doneButton}
-                </div>
-                <div className="flex flex-wrap gap-2">
                   {compatibleUnits(item.unit).map((u) => (
                     <Chip key={u} selected={amountUnit === u} onClick={() => setAmountUnit(u)}>
                       {unitLabel(u)}
                     </Chip>
                   ))}
                 </div>
+                <div className="flex justify-end">{doneButton}</div>
               </div>
             ) : (
               <div className="flex items-start justify-between gap-3">
