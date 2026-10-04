@@ -4,7 +4,10 @@ import { api } from "@/api/client";
 import { PriceHistoryChart } from "@/components/domain";
 import { LinkButton, Section, Skeleton } from "@/components/ui";
 
+import { useAppStore } from "@/store/useAppStore";
+
 export function HistorySection({ verdict }: { verdict: Verdict }) {
+  const mode = useAppStore((s) => s.priceDisplay);
   const itemId = verdict.item.id;
   const q = useQuery({ queryKey: ["item", itemId], queryFn: () => api.getItem(itemId) });
   return (
@@ -21,10 +24,10 @@ export function HistorySection({ verdict }: { verdict: Verdict }) {
       {q.data && (
         <PriceHistoryChart
           detail={q.data}
-          mode="unit"
+          mode={mode}
           focusRetailer={verdict.input.retailerId}
           compact
-          markPrice={verdict.unitPrice}
+          markPrice={mode === "unit" ? verdict.unitPrice : verdict.unitPrice * (verdict.input.sizeQty ?? verdict.item.sizeQty)}
           markTier={verdict.tier}
         />
       )}

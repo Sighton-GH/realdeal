@@ -1,3 +1,4 @@
+import { EXPANDED_ITEMS } from "./expanded-items";
 import type { Item } from "../types";
 import type { SeedItem } from "./types";
 
@@ -12,7 +13,17 @@ export const SEED_ITEMS: SeedItem[] = [
       unit: "L",
       sizeLabel: "4 L",
       artKey: "milk",
-      aliases: ["2% milk", "milk", "2 percent milk", "partly skimmed milk"],
+      aliases: [
+        "2% milk",
+        "milk",
+        "2 percent milk",
+        "partly skimmed milk",
+        "4l milk",
+        "2l milk",
+        "1l milk",
+        "2% milk 2l",
+        "2% milk 4l",
+      ],
       searchQuery: "2% milk 4 L",
     },
     basePrice: 6.39,
@@ -26,7 +37,16 @@ export const SEED_ITEMS: SeedItem[] = [
       unit: "L",
       sizeLabel: "2 L",
       artKey: "milk",
-      aliases: ["homo milk", "homogenized milk", "whole milk", "3.25% milk"],
+      aliases: [
+        "homo milk",
+        "homogenized milk",
+        "whole milk",
+        "3.25% milk",
+        "homo milk 4l",
+        "homo milk 2l",
+        "4l milk",
+        "2l milk",
+      ],
       searchQuery: "homogenized milk 2 L",
     },
     basePrice: 4.79,
@@ -1817,4 +1837,4 @@ export const SEED_ITEMS: SeedItem[] = [
   },
 ];
 
-export const ITEMS: Item[] = SEED_ITEMS.map((s) => s.item);
+export const ITEMS: Item[] = [...SEED_ITEMS.map((s) => s.item), ...EXPANDED_ITEMS];

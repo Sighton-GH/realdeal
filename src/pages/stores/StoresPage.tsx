@@ -9,7 +9,7 @@ import { EmptyState, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { formatWeek } from "@/lib/format";
 
-export const storeDot: Record<TileColour, string> = { tangerine: "bg-tangerine", pink: "bg-pink", teal: "bg-teal", violet: "bg-violet" };
+export const storeDot: Record<TileColour, string> = { tangerine: "bg-tangerine", pink: "bg-pink", teal: "bg-teal", violet: "bg-violet", berry: "bg-berry", forest: "bg-forest", indigo: "bg-indigo", slate: "bg-slate" };
 
 export function sourceLabel(s: StoreSummary): string {
   if (s.itemCount === 0) return "No prices yet";

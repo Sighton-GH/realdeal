@@ -11,8 +11,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { stepSlide } from "@/lib/motion";
+import { getDefaultSizeForItem, getSizesForItem, type ItemSizeOption } from "@/lib/itemSizes";
 import { EntryHeader } from "./entry/EntryHeader";
-import { StepStore } from "./entry/StepStore";
 import { StepPrice } from "./entry/StepPrice";
 import { StepExtras } from "./entry/StepExtras";
 import { parseInitialEntryState, toItemSizeQty, type EntryStep } from "./entry/entryState";
@@ -72,7 +72,23 @@ function PriceEntryFlow({ item }: { item: Item }) {
 
   const [initialState] = useState(() => parseInitialEntryState(searchParams, item));
 
-  const [retailerId, setRetailerId] = useState<RetailerId | null>(initialState.retailerId);
+  const [selectedSize, setSelectedSize] = useState<ItemSizeOption>(() => {
+    const sizes = getSizesForItem(item);
+    const sizeParam = searchParams.get("size");
+    if (sizeParam) {
+      const sizeNum = Number.parseFloat(sizeParam);
+      const found = sizes.find((s) => Math.abs(s.sizeQty - sizeNum) < 0.001);
+      if (found) return found;
+      return {
+        label: searchParams.get("sizeLabel") || `${sizeNum} ${item.unit}`,
+        sizeQty: sizeNum,
+        description: "Custom size",
+      };
+    }
+    return getDefaultSizeForItem(item);
+  });
+
+  const [retailerId, setRetailerId] = useState<RetailerId>(initialState.retailerId);
   const [price, setPrice] = useState<string>(initialState.price);
   const [hasWasPrice, setHasWasPrice] = useState<boolean>(initialState.hasWasPrice);
   const [wasPrice, setWasPrice] = useState<string>(initialState.wasPrice);
@@ -82,14 +98,32 @@ function PriceEntryFlow({ item }: { item: Item }) {
   const [hasCustomSize, setHasCustomSize] = useState<boolean>(initialState.hasCustomSize);
   const [customSize, setCustomSize] = useState<string>(initialState.customSize);
 
+  const handleSelectSize = (newSize: ItemSizeOption) => {
+    setSelectedSize(newSize);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("size", String(newSize.sizeQty));
+      next.set("sizeLabel", newSize.label);
+      return next;
+    });
+  };
+
+  const handleSelectRetailer = (selected: RetailerId) => {
+    setRetailerId(selected);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("store", selected);
+      return next;
+    });
+  };
+
   // Sync step from search params (enables browser back/forward)
   const stepParam = searchParams.get("step");
   const requestedStep: EntryStep =
-    stepParam === "1" || stepParam === "2" || stepParam === "3"
-      ? (Number.parseInt(stepParam, 10) as EntryStep)
-      : initialState.step;
-  // A shared or stale URL can ask for a step we can't show yet: fall back to the last complete one
-  const step: EntryStep = !retailerId ? 1 : requestedStep === 3 && parsePriceInput(price) <= 0 ? 2 : requestedStep;
+    stepParam === "2"
+      ? 2
+      : 1;
+  const step: EntryStep = requestedStep === 2 && parsePriceInput(price) <= 0 ? 1 : requestedStep;
 
   const setStep = (nextStep: EntryStep) => {
     setSearchParams((prev) => {
@@ -97,6 +131,8 @@ function PriceEntryFlow({ item }: { item: Item }) {
       next.set("step", String(nextStep));
       if (retailerId) next.set("store", retailerId);
       if (price) next.set("price", price);
+      next.set("size", String(selectedSize.sizeQty));
+      next.set("sizeLabel", selectedSize.label);
       return next;
     });
   };
@@ -105,21 +141,13 @@ function PriceEntryFlow({ item }: { item: Item }) {
     navigate("/check");
   };
 
-  const handleStoreSelect = (selected: RetailerId) => {
-    setRetailerId(selected);
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set("store", selected);
-      next.set("step", "2");
-      return next;
-    });
-  };
-
   const handlePriceContinue = () => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      next.set("step", "3");
+      next.set("step", "2");
       if (price) next.set("price", price);
+      next.set("size", String(selectedSize.sizeQty));
+      next.set("sizeLabel", selectedSize.label);
       return next;
     });
   };
@@ -157,6 +185,8 @@ function PriceEntryFlow({ item }: { item: Item }) {
       if (sizeQty !== undefined) {
         input.sizeQty = sizeQty;
       }
+    } else {
+      input.sizeQty = selectedSize.sizeQty;
     }
 
     void run(input);
@@ -164,33 +194,31 @@ function PriceEntryFlow({ item }: { item: Item }) {
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-[420px] flex-col px-4 pb-8 pt-2">
-      <EntryHeader step={step} item={item} onClose={handleClose} />
+      <EntryHeader step={step} item={item} selectedSize={selectedSize} onClose={handleClose} />
 
       <main className="flex-1">
         <AnimatePresence mode="wait">
           {step === 1 && (
             <motion.div key="step-1" {...stepSlide} className="w-full">
-              <StepStore selectedId={retailerId} onSelect={handleStoreSelect} />
-            </motion.div>
-          )}
-
-          {step === 2 && (
-            <motion.div key="step-2" {...stepSlide} className="w-full">
               <StepPrice
                 item={item}
                 value={price}
                 onChange={setPrice}
                 onContinue={handlePriceContinue}
+                selectedSize={selectedSize}
+                onSelectSize={handleSelectSize}
               />
             </motion.div>
           )}
 
-          {step === 3 && retailerId && (
-            <motion.div key="step-3" {...stepSlide} className="w-full">
+          {step === 2 && (
+            <motion.div key="step-2" {...stepSlide} className="w-full">
               <StepExtras
                 item={item}
                 retailerId={retailerId}
+                onSelectRetailer={handleSelectRetailer}
                 price={price}
+                selectedSize={selectedSize}
                 hasWasPrice={hasWasPrice}
                 setHasWasPrice={setHasWasPrice}
                 wasPrice={wasPrice}

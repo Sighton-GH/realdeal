@@ -10,6 +10,8 @@ import { useAppStore } from "@/store/useAppStore";
 
 export function SettingsPage() {
   useTopBar({ title: "Settings" });
+  const priceDisplay = useAppStore((s) => s.priceDisplay);
+  const setPriceDisplay = useAppStore((s) => s.setPriceDisplay);
   const soundOn = useAppStore((s) => s.soundOn);
   const toggleSound = useAppStore((s) => s.toggleSound);
   const hidden = useAppStore((s) => s.hiddenStores);
@@ -21,6 +23,15 @@ export function SettingsPage() {
   return (
     <div className="flex flex-col gap-7 px-5 py-6">
       <h1 className="font-display text-h1 font-bold">Settings</h1>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-h3 font-extrabold">Price units</h2>
+        <p className="text-small font-bold text-ink-soft">Compare prices per package or per kg, L, each or dozen, depending on the item. Price entry always uses the package price on the tag (per kg for loose produce).</p>
+        <div role="group" aria-label="Price display units" className="flex flex-wrap gap-2">
+          <Chip selected={priceDisplay === "package"} onClick={() => setPriceDisplay("package")}>Per package</Chip>
+          <Chip selected={priceDisplay === "unit"} onClick={() => setPriceDisplay("unit")}>Per kg / L / each</Chip>
+        </div>
+      </section>
 
       <section className="flex flex-col gap-2">
         <h2 className="text-h3 font-extrabold">Sound</h2>

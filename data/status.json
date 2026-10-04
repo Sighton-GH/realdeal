@@ -1,0 +1,50 @@
+{
+  "mode": "live",
+  "updatedAt": "2026-10-04T02:29:36.718Z",
+  "sources": [
+    "seed",
+    "hammer"
+  ],
+  "retailers": [
+    {
+      "retailerId": "saveon",
+      "ok": true,
+      "itemsFound": 130
+    },
+    {
+      "retailerId": "nofrills",
+      "ok": true,
+      "itemsFound": 130
+    },
+    {
+      "retailerId": "walmart",
+      "ok": true,
+      "itemsFound": 131
+    },
+    {
+      "retailerId": "tnt",
+      "ok": true,
+      "itemsFound": 128
+    },
+    {
+      "retailerId": "loblaws",
+      "ok": true,
+      "itemsFound": 90
+    },
+    {
+      "retailerId": "metro",
+      "ok": true,
+      "itemsFound": 80
+    },
+    {
+      "retailerId": "voila",
+      "ok": true,
+      "itemsFound": 90
+    },
+    {
+      "retailerId": "galleria",
+      "ok": true,
+      "itemsFound": 45
+    }
+  ]
+}

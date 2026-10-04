@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SEED_ITEMS } from "./items";
 import { RETAILERS } from "../retailers";
 import { DATA_END, WEEKS } from "./constants";
 import { generateSeedStore, mondays } from "./generate";
@@ -36,7 +37,7 @@ describe("deterministic seed generator", () => {
       expect(day).toBe(1);
     }
 
-    for (const item of store.items) {
+    for (const { item } of SEED_ITEMS) {
       for (const retailer of RETAILERS.filter((r) => ["saveon", "nofrills", "walmart", "tnt"].includes(r.id))) {
         const itemRetailerPoints = chainPoints.filter(
           (p) => p.itemId === item.id && p.retailerId === retailer.id,
@@ -73,9 +74,9 @@ describe("deterministic seed generator", () => {
     const chainPoints = store.points.filter((p) => !p.storeId);
     const branchPoints = store.points.filter((p) => Boolean(p.storeId));
 
-    expect(chainPoints).toHaveLength(store.items.length * 4 * 26);
+    expect(chainPoints).toHaveLength(SEED_ITEMS.length * 4 * 26);
     expect(branchPoints).toHaveLength(
-      store.items.length * store.locations.length,
+      SEED_ITEMS.length * store.locations.length,
     );
 
     if (store.items.length === 40) {

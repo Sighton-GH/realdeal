@@ -8,15 +8,25 @@ import { useTopBar } from "@/components/layout";
 import { Chip, EmptyState, PriceText, Skeleton } from "@/components/ui";
 import { ItemRow } from "@/components/domain";
 
+import { useAppStore } from "@/store/useAppStore";
+import { displayedPrice } from "@/lib/priceDisplay";
+
 const CATEGORIES: Array<{ id: Category | "all"; label: string }> = [
   { id: "all", label: "All" },
   { id: "dairy", label: "Dairy" },
   { id: "produce", label: "Produce" },
   { id: "bakery", label: "Bakery" },
   { id: "pantry", label: "Pantry" },
+  { id: "meat", label: "Meat" },
+  { id: "seafood", label: "Seafood" },
+  { id: "frozen", label: "Frozen" },
+  { id: "snacks", label: "Snacks" },
+  { id: "drinks", label: "Drinks" },
+  { id: "household", label: "Household" },
 ];
 
 export function StoreDetailPage() {
+  const priceDisplay = useAppStore((s) => s.priceDisplay);
   const { retailerId } = useParams();
   const known = RETAILERS.some((r) => r.id === retailerId);
   const retailer = known ? retailerById(retailerId as RetailerId) : undefined;
@@ -55,7 +65,7 @@ export function StoreDetailPage() {
               onClick={() => navigate(`/check/${r.item.id}?store=${retailer.id}`)}
               right={
                 <span className="flex flex-col items-end">
-                  <PriceText amount={r.price} size="sm" />
+                  <PriceText {...displayedPrice(r.price, r.unitPrice, r.item, priceDisplay)} size="sm" />
                   <span className="text-micro font-bold text-ink-soft">
                     {r.onSale ? "sale · " : ""}{r.source === "seed" ? "sample" : "real"}
                   </span>

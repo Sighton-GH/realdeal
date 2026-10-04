@@ -6,6 +6,8 @@ import { api } from "@/api/client";
 import { Button, PriceText, Section, Skeleton, VerdictBadge } from "@/components/ui";
 import { formatDistance, formatMoney, formatUnitPrice } from "@/lib/format";
 import { useUserLocation } from "@/lib/useUserLocation";
+import { useAppStore } from "@/store/useAppStore";
+import { displayedPrice } from "@/lib/priceDisplay";
 import { cn } from "@/lib/cn";
 
 export interface NearbyPricesProps {
@@ -21,6 +23,7 @@ const tileDotClass: Record<TileColour, string> = {
   pink: "bg-pink",
   teal: "bg-teal",
   violet: "bg-violet",
+  berry: "bg-berry", forest: "bg-forest", indigo: "bg-indigo", slate: "bg-slate",
 };
 
 export function NearbyPrices({
@@ -30,6 +33,7 @@ export function NearbyPrices({
   title = "Prices near you",
   className,
 }: NearbyPricesProps) {
+  const mode = useAppStore((s) => s.priceDisplay);
   const { point, source, status, request } = useUserLocation();
 
   const queryLimit = limit ?? 6;
@@ -172,10 +176,10 @@ export function NearbyPrices({
                 {/* Right: price, unit price and verdict stacked so the branch name keeps its room */}
                 <div className="flex shrink-0 items-center gap-2">
                   <div className="flex flex-col items-end gap-0.5 text-right">
-                    <PriceText amount={n.price} size="md" />
-                    <span className="text-small font-bold text-ink-soft">
+                    <PriceText {...(itemDetail ? displayedPrice(n.price, n.unitPrice, itemDetail.item, mode) : { amount: n.price })} size="md" />
+                    {mode === "package" && <span className="text-small font-bold text-ink-soft">
                       {unit ? formatUnitPrice(n.unitPrice, unit) : formatMoney(n.unitPrice)}
-                    </span>
+                    </span>}
                     <VerdictBadge tier={n.tier} size="sm" />
                   </div>
                   <span className="text-ink-soft">

@@ -1,7 +1,7 @@
 import type { PricePoint, PriceStore, RetailerId } from "../types";
 import { RETAILERS } from "../retailers";
 import { DATA_END, WEEKS } from "./constants";
-import { SEED_ITEMS, ITEMS } from "./items";
+import { SEED_ITEMS } from "./items";
 import { LOCATIONS } from "./locations";
 import type { SeedItem } from "./types";
 import { hashString, mulberry32 } from "./rng";
@@ -500,7 +500,7 @@ export function generateSeedStore(): PriceStore {
   }
 
   return {
-    items: ITEMS,
+    items: SEED_ITEMS.map((s) => s.item),
     points,
     locations: LOCATIONS,
     generatedAt: DATA_END + "T12:00:00.000Z",

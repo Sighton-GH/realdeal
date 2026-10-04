@@ -1,0 +1,82 @@
+[
+  {
+    "itemId": "ruffles-regular-potato-chips-lightly-salted-200g",
+    "productId": "iwhNQw2kUCK7rAsQ+NfZHw==",
+    "vendor": "Voila",
+    "product_name": "Ruffles Regular Potato Chips Lightly Salted 200 g",
+    "units": "200g",
+    "source": "https://jacobfilipp.com/hammerdata/hammer-5-csv.zip"
+  },
+  {
+    "itemId": "farm-boy-white-cheddar-popcorn-125g",
+    "productId": "dWg5PnyflO9cIt8YTV18zQ==",
+    "vendor": "Voila",
+    "product_name": "Farm Boy White Cheddar Popcorn 125 g",
+    "units": "125g",
+    "source": "https://jacobfilipp.com/hammerdata/hammer-5-csv.zip"
+  },
+  {
+    "itemId": "lean-ground-beef-454g",
+    "productId": "amActtW3KDngaBujw4gciQ==",
+    "vendor": "Loblaws",
+    "product_name": "Lean Ground Beef",
+    "units": "454g",
+    "source": "https://jacobfilipp.com/hammerdata/hammer-5-csv.zip"
+  },
+  {
+    "itemId": "longos-frozen-peas-and-carrots-750g",
+    "productId": "Voila13877EA",
+    "vendor": "Voila",
+    "product_name": "Longos Frozen Peas and Carrots 750 g",
+    "units": "750g",
+    "source": "https://jacobfilipp.com/hammerdata/hammer-5-csv.zip"
+  },
+  {
+    "itemId": "best-buy-frozen-peas-and-carrots-2kg",
+    "productId": "Voila408915EA",
+    "vendor": "Voila",
+    "product_name": "Best Buy Frozen Peas and Carrots 2 kg",
+    "units": "2kg",
+    "source": "https://jacobfilipp.com/hammerdata/hammer-5-csv.zip"
+  },
+  {
+    "itemId": "best-buy-frozen-shrimp-pacific-white-peeled-tail-on-raw-300g",
+    "productId": "Voila849679EA",
+    "vendor": "Voila",
+    "product_name": "Best Buy Frozen Shrimp Pacific White Peeled Tail-On Raw 300 g",
+    "units": "300g",
+    "source": "https://jacobfilipp.com/hammerdata/hammer-5-csv.zip"
+  },
+  {
+    "itemId": "compliments-frozen-pacific-white-shrimp-raw-peeled-deveined-340g",
+    "productId": "Voila435131EA",
+    "vendor": "Voila",
+    "product_name": "Compliments Frozen Pacific White Shrimp Raw Peeled Deveined 340 g",
+    "units": "340g",
+    "source": "https://jacobfilipp.com/hammerdata/hammer-5-csv.zip"
+  },
+  {
+    "itemId": "the-unscented-company-dish-soap-750ml",
+    "productId": "Loblaws21332390_EA",
+    "vendor": "Loblaws",
+    "product_name": "Dish Soap",
+    "units": "750ml",
+    "source": "https://jacobfilipp.com/hammerdata/hammer-5-csv.zip"
+  },
+  {
+    "itemId": "down-east-laundry-liquid-detergent-3l",
+    "productId": "Loblaws20557904_EA",
+    "vendor": "Loblaws",
+    "product_name": "Laundry Liquid Detergent",
+    "units": "3l",
+    "source": "https://jacobfilipp.com/hammerdata/hammer-5-csv.zip"
+  },
+  {
+    "itemId": "tropicana-orange-juice-no-pulp-2-63l",
+    "productId": "Walmart205804",
+    "vendor": "Walmart",
+    "product_name": "Tropicana 100% Pure Orange Juice No Pulp, 2.63L, 2.63L",
+    "units": "2.63l",
+    "source": "https://jacobfilipp.com/hammerdata/hammer-5-csv.zip"
+  }
+]

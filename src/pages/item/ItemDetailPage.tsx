@@ -10,12 +10,17 @@ import { DataFreshness, NearbyPrices, PriceHistoryChart, SaleStreak } from "@/co
 import { useTopBar } from "@/components/layout";
 import { PennyFace } from "@/components/penny";
 import { Button, Card, Chip, EmptyState, LinkButton, PriceText, Section, Skeleton, VerdictBadge } from "@/components/ui";
-import { formatMoney, formatSize, formatUnitPrice } from "@/lib/format";
+import { formatMoney, formatUnitPrice } from "@/lib/format";
+import { getDefaultSizeForItem, getSizesForItem, type ItemSizeOption } from "@/lib/itemSizes";
 import { useRunCheck } from "@/pages/check/useRunCheck";
 import { checkInput, currentOffer, historyFor, unitLabel } from "./itemDetailModel";
 
+import { useAppStore } from "@/store/useAppStore";
+import { displayedPrice } from "@/lib/priceDisplay";
+
 const dotClass: Record<TileColour, string> = {
   tangerine: "bg-tangerine", pink: "bg-pink", teal: "bg-teal", violet: "bg-violet",
+  berry: "bg-berry", forest: "bg-forest", indigo: "bg-indigo", slate: "bg-slate",
 };
 
 function StoreDot({ tile }: { tile: TileColour }) {
@@ -39,7 +44,10 @@ function ItemLoading() {
 
 function ItemEvidence({ detail }: { detail: ItemDetail }) {
   const { item, stats } = detail;
-  const [mode, setMode] = useState<"unit" | "package">("unit");
+  const mode = useAppStore((s) => s.priceDisplay);
+  const setMode = useAppStore((s) => s.setPriceDisplay);
+  const availableSizes = getSizesForItem(item);
+  const [selectedSize, setSelectedSize] = useState<ItemSizeOption>(() => getDefaultSizeForItem(item));
   const [focusRetailer, setFocusRetailer] = useState<RetailerId>();
   const { run, running, error } = useRunCheck();
   const offers = stats.byRetailer.map((store) => currentOffer(detail, store))
@@ -55,22 +63,54 @@ function ItemEvidence({ detail }: { detail: ItemDetail }) {
         <ItemArt artKey={item.artKey} size={72} className="shrink-0" />
         <div className="min-w-0">
           <h1 className="font-display text-h1 font-bold">{item.name}</h1>
-          <p className="mt-1 text-small font-bold text-ink-soft">{item.sizeLabel}</p>
+          <p className="mt-1 text-small font-bold text-ink-soft">Standard size: {item.sizeLabel}</p>
           <p className="text-small font-bold capitalize text-ink-soft">{item.category}</p>
         </div>
       </header>
-      <LinkButton to={`/check/${item.id}`} fullWidth>Check a price</LinkButton>
+
+      {/* Package Size Selector */}
+      <div className="flex flex-col gap-2 rounded-md border-2 border-line bg-canvas p-3.5">
+        <div className="flex items-center justify-between">
+          <span className="font-display text-small font-extrabold text-ink">
+            Package size
+          </span>
+          <span className="text-small font-bold text-ink-soft">
+            {selectedSize.description ?? selectedSize.label}
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-2 pt-1">
+          {availableSizes.map((s) => (
+            <Chip
+              key={s.label}
+              selected={selectedSize.label === s.label && Math.abs(selectedSize.sizeQty - s.sizeQty) < 0.001}
+              onClick={() => setSelectedSize(s)}
+              className="min-h-11"
+            >
+              {s.label}
+            </Chip>
+          ))}
+        </div>
+      </div>
+
+      <LinkButton
+        to={`/check/${item.id}?size=${selectedSize.sizeQty}&sizeLabel=${encodeURIComponent(selectedSize.label)}`}
+        fullWidth
+      >
+        Check a price for {selectedSize.label}
+      </LinkButton>
+
       <section aria-label="Usual price" className="flex flex-col gap-4">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="font-extrabold">Usual price</span>
-          <PriceText amount={stats.avgUnit90 * item.sizeQty} size="lg" />
-          <span className="text-small font-bold text-ink-soft">{formatUnitPrice(stats.avgUnit90, item.unit)}</span>
+          <PriceText {...displayedPrice(stats.avgUnit90 * item.sizeQty, stats.avgUnit90, item, mode)} size="lg" />
+          {mode === "package" && item.sizeLabel !== "per kg" && <span className="text-small font-bold text-ink-soft">{formatUnitPrice(stats.avgUnit90, item.unit)}</span>}
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Card tone="sunken"><p className="mb-1 text-small font-bold text-ink-soft">90-day low</p><PriceText amount={stats.lowUnit90} unit={item.unit} size="md" /></Card>
-          <Card tone="sunken"><p className="mb-1 text-small font-bold text-ink-soft">90-day high</p><PriceText amount={stats.highUnit90} unit={item.unit} size="md" /></Card>
+          <Card tone="sunken"><p className="mb-1 text-small font-bold text-ink-soft">90-day low</p><PriceText {...displayedPrice(stats.lowUnit90 * item.sizeQty, stats.lowUnit90, item, mode)} size="md" /></Card>
+          <Card tone="sunken"><p className="mb-1 text-small font-bold text-ink-soft">90-day high</p><PriceText {...displayedPrice(stats.highUnit90 * item.sizeQty, stats.highUnit90, item, mode)} size="md" /></Card>
         </div>
       </section>
+      {mode === "package" && item.sizeLabel !== "per kg" && <p className="-mt-4 text-small font-bold text-ink-soft">Usual price and 90-day range are for a {item.sizeLabel} package. History shows each week's actual package price.</p>}
       <Section title="Price history">
         <div role="group" aria-label="Price history units" className="flex flex-wrap gap-2">
           <Chip selected={mode === "unit"} onClick={() => setMode("unit")} className="min-h-12">{unitLabel[item.unit]}</Chip>
@@ -92,15 +132,22 @@ function ItemEvidence({ detail }: { detail: ItemDetail }) {
           <div className="flex flex-col gap-3" aria-busy={running}>
             {offers.map(({ stats: store, offer, unitPrice }) => {
               const retailer = retailerById(store.retailerId);
+              const shelfPrice = Math.round(store.currentUnitPrice * selectedSize.sizeQty * 100) / 100;
               return (
                 <Button key={store.retailerId} variant="secondary" fullWidth disabled={running}
                   className="h-auto min-h-12 px-4 py-4 font-body normal-case tracking-normal [&>span]:w-full"
-                  aria-label={`Check ${retailer.name} price, ${formatMoney(store.currentPrice)}, ${formatUnitPrice(unitPrice, item.unit)}`}
-                  onClick={() => { void run(checkInput(detail, store)); }}>
+                  aria-label={`Check ${retailer.name} price, ${formatMoney(shelfPrice)}, ${formatUnitPrice(unitPrice, item.unit)}`}
+                  onClick={() => {
+                    void run({
+                      ...checkInput(detail, store),
+                      sizeQty: selectedSize.sizeQty,
+                      price: shelfPrice,
+                    });
+                  }}>
                   <span className="flex w-full flex-col gap-2 text-left text-ink">
                     <span className="flex items-start justify-between gap-3">
                       <span className="flex min-w-0 items-center gap-2 pt-1 font-extrabold"><StoreDot tile={retailer.tile} />{retailer.name}</span>
-                      <span className="flex shrink-0 flex-col items-end"><PriceText amount={store.currentPrice} size="md" /><span className="text-small font-bold text-ink-soft">{formatUnitPrice(unitPrice, item.unit)}</span></span>
+                      <span className="flex shrink-0 flex-col items-end"><PriceText {...displayedPrice(store.currentPrice, unitPrice, item, mode)} size="md" />{mode === "package" && <span className="text-small font-bold text-ink-soft">{formatUnitPrice(unitPrice, item.unit)}</span>}</span>
                     </span>
                     <span className="flex flex-wrap items-center gap-2">
                       <VerdictBadge tier={tierFor((unitPrice - stats.avgUnit90) / stats.avgUnit90)} size="sm" />
@@ -108,7 +155,7 @@ function ItemEvidence({ detail }: { detail: ItemDetail }) {
                       {store.live && <span className="rounded-full bg-sunken px-2 py-1 text-micro font-extrabold">Live price</span>}
                     </span>
                     {offer?.multiBuy && <span className="text-small font-bold text-ink-soft">{offer.multiBuy.qty} for {formatMoney(offer.multiBuy.total)}</span>}
-                    {store.currentSizeQty !== item.sizeQty && <span className="text-small font-bold text-ink-soft">Package size: {formatSize(store.currentSizeQty, item.unit)}</span>}
+                    <span className="text-small font-bold text-ink-soft">Package size: {selectedSize.label}</span>
                   </span>
                 </Button>
               );

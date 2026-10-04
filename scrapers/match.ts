@@ -22,6 +22,10 @@ export function normalise(text: string): string[] {
   if (!text) return [];
   const words = text
     .toLowerCase()
+    .replace(/\ballpurpose\b/g, "all purpose")
+    .replace(/\bpartly\s+skimmed\b/g, "2% milk")
+    .replace(/\bchick\s+peas?\b/g, "chickpeas")
+    .replace(/\belbows?\b/g, "macaroni")
     .replace(/[^\w\s%]/g, " ")
     .split(/\s+/)
     .filter(Boolean);
@@ -75,7 +79,7 @@ const CONFLICT_RULES: ConflictRule[] = [
   // 2% milk cannot match chocolate, flavoured, or other milk fat percentages
   {
     itemFilter: (item) => item.id.includes("milk-2pct"),
-    rejectWords: ["chocolate", "strawberry", "vanilla", "homo", "homogenized", "whole", "skim", "1%", "3.25%", "almond", "oat", "soy"],
+    rejectWords: ["chocolate", "strawberry", "vanilla", "homo", "homogenized", "whole", "1%", "3.25%", "almond", "oat", "soy"],
   },
   // Homo milk cannot match 2%, 1%, skim, or chocolate
   {
@@ -90,7 +94,7 @@ const CONFLICT_RULES: ConflictRule[] = [
   // Whole wheat flour cannot match all purpose or white
   {
     itemFilter: (item) => item.id.includes("flour-ww"),
-    rejectWords: ["purpose", "white"],
+    rejectWords: ["white"],
   },
   // White bread cannot match whole wheat
   {
@@ -210,6 +214,17 @@ function scoreProductMatch(
   const productTokens = normalise(fullProductText);
   const productTokenSet = new Set(productTokens);
 
+  // Do not compare basic groceries with prepared foods carrying their names.
+  const itemText = [item.name, ...item.aliases].join(" ").toLowerCase();
+  if (/\b(?:pies?|tarts?|popcorn|cakes?|cookies?|juices?|sauces?|ice cream|ice milk|puddings?)\b/i.test(fullProductText)
+      && !/\b(?:pies?|tarts?|popcorn|cakes?|cookies?|juices?|sauces?|ice cream|ice milk|puddings?)\b/i.test(itemText)) return null;
+  if (item.id.includes("milk-2pct") && /\bskim(?:med)?\b/i.test(fullProductText)
+      && !/partly\s+skimmed/i.test(fullProductText)) return null;
+  if (item.id.includes("milk-skim") && /partly\s+skimmed/i.test(fullProductText)) return null;
+
+  if (item.id.includes("milk-skim") && !/\bskim(?:med)?\b|\b0%/i.test(fullProductText)) return null;
+  if (item.id.includes("milk-2pct") && !/2\s*%|partly\s+skimmed/i.test(fullProductText)) return null;
+
   // Check hard conflicts
   for (const rule of CONFLICT_RULES) {
     if (rule.itemFilter(item)) {
@@ -224,7 +239,13 @@ function scoreProductMatch(
   // Different variant of the same staple (brown sugar, olive oil, ...)
   const vocab = itemVocabulary(item);
   for (const t of productTokenSet) {
-    if (VARIANT_WORDS.has(t) && !vocab.has(t)) return null;
+    if (VARIANT_WORDS.has(t) && !vocab.has(t)
+        && !(t === "red" && item.id.includes("kidney"))
+        && !(t === "medium" && item.id.includes("coffee"))
+        && !(t === "whole" && item.id.includes("oats"))
+        && !(t === "brown" && item.artKey === "eggs")
+        && !(t === "extra" && (item.id.includes("pineapple") || item.id.includes("peppers")))
+        && !(t === "skimmed" && item.id.includes("milk-2pct") && /partly\s+skimmed/i.test(fullProductText))) return null;
   }
   const required = REQUIRED_ANY.find((r) => r.itemId === item.id);
   if (required && !required.anyOf.some((w) => productTokenSet.has(w))) return null;

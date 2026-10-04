@@ -1,3 +1,4 @@
+import { SEED_ITEMS } from "./seed/items";
 import { describe, expect, it } from "vitest";
 import { generateSeedStore } from "./seed/generate";
 import { getStoreItems, getStoreSummaries } from "./stores";
@@ -9,14 +10,14 @@ describe("store summaries", () => {
     const summaries = getStoreSummaries(store);
     expect(summaries.map((s) => s.retailerId)).toEqual(["saveon", "nofrills", "walmart", "tnt", "loblaws", "metro", "voila", "galleria"]);
     const saveon = summaries.find((s) => s.retailerId === "saveon")!;
-    expect(saveon.itemCount).toBe(store.items.length);
+    expect(saveon.itemCount).toBe(SEED_ITEMS.length);
     expect(saveon.realItemCount).toBe(0);
     expect(summaries.find((s) => s.retailerId === "metro")!.itemCount).toBe(0);
   });
 
   it("returns one latest row per item", () => {
     const rows = getStoreItems(store, "walmart");
-    expect(rows).toHaveLength(store.items.length);
+    expect(rows).toHaveLength(SEED_ITEMS.length);
     expect(new Set(rows.map((r) => r.item.id)).size).toBe(rows.length);
   });
 });

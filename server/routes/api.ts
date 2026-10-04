@@ -30,7 +30,7 @@ apiRoute.route("/speak", speakRoute);
 apiRoute.get("/items", (c) => {
   const q = c.req.query("q") ?? "";
   const catParam = c.req.query("category");
-  const category = (catParam && ["produce", "dairy", "bakery", "pantry"].includes(catParam))
+  const category = (catParam && ["produce", "dairy", "bakery", "pantry", "meat", "seafood", "frozen", "snacks", "drinks", "household"].includes(catParam))
     ? (catParam as Category)
     : undefined;
 

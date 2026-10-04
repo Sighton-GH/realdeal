@@ -4,7 +4,7 @@ import readline from "node:readline";
 import { ITEMS } from "../shared/seed/items";
 import type { PricePoint, RetailerId } from "../shared/types";
 import { mondayOf } from "./lib/week";
-import { matchProduct } from "./match";
+import { matchWithOverrides, type HammerOverrides } from "./hammer-overrides";
 import type { RawProduct } from "./types";
 
 const HAMMER_DIR = path.resolve(process.cwd(), "data/hammer");
@@ -89,6 +89,12 @@ async function run(): Promise<void> {
   console.log(`[Hammer Import] Found product file: ${productFile}`);
   console.log(`[Hammer Import] Found price file: ${priceFile}`);
 
+  const overrides = new Map<RetailerId, HammerOverrides>();
+  for (const retailer of ["saveon", "nofrills", "walmart", "tnt", "loblaws", "metro", "voila", "galleria"] as RetailerId[]) {
+    const file = path.resolve("data/overrides", `${retailer}.json`);
+    if (fs.existsSync(file)) overrides.set(retailer, JSON.parse(fs.readFileSync(file, "utf8")) as HammerOverrides);
+  }
+
   // Step 1: Parse products CSV
   const matchedProducts = new Map<string, ProductInfo>();
 
@@ -141,15 +147,11 @@ async function run(): Promise<void> {
       price: 0,
     };
 
-    // Match against our catalogue items
-    let best: { item: (typeof ITEMS)[number]; score: number } | null = null;
-    for (const item of ITEMS) {
-      const match = matchProduct(item, [rawProduct]);
-      if (match && (!best || match.score > best.score)) best = { item, score: match.score };
-    }
+    // Strict size evidence before assigning a Hammer product to a catalogue package.
+    const best = matchWithOverrides(ITEMS, rawProduct, prodId, overrides.get(retailerId));
     if (best) {
       const item = best.item;
-      const isPerKgProduce = item.unit === "kg" && item.sizeQty === 1;
+      const isPerKgProduce = item.unit === "kg" && item.sizeLabel === "per kg";
       const perLb = isPerKgProduce && PER_LB_PATTERN.test(`${size ?? ""} ${name}`);
       matchedProducts.set(prodId, { itemId: item.id, retailerId, perLb });
     }
@@ -236,6 +238,34 @@ async function run(): Promise<void> {
   // Step 3: Filter to latest 26 weeks
   const allWeeks = Array.from(new Set(Array.from(weeklyMap.values()).map((o) => o.weekMonday))).sort();
   const latest26Weeks = new Set(allWeeks.slice(-26));
+
+  // Rank product continuity within the actual display window, not its lifetime history.
+  for (const [key, obs] of weeklyMap) if (!latest26Weeks.has(obs.weekMonday)) weeklyMap.delete(key);
+
+  // Several Hammer products can match one catalogue item at one store (brands, sizes).
+  // Mixing them makes the weekly price jump around, so keep only the product with the
+  // most weeks of history for each item x store pair.
+  const weeksByProduct = new Map<string, number>();
+  for (const [key] of weeklyMap) {
+    const [itemId, retailerId, , prodId] = key.split("|");
+    const k = `${itemId}|${retailerId}|${prodId}`;
+    weeksByProduct.set(k, (weeksByProduct.get(k) ?? 0) + 1);
+  }
+  const bestProduct = new Map<string, string>();
+  const bestCount = new Map<string, number>();
+  for (const [k, n] of weeksByProduct) {
+    const [itemId, retailerId, prodId] = k.split("|");
+    const pair = `${itemId}|${retailerId}`;
+    if (n > (bestCount.get(pair) ?? 0)) {
+      bestCount.set(pair, n);
+      bestProduct.set(pair, prodId);
+    }
+  }
+  for (const [key] of Array.from(weeklyMap)) {
+    const [itemId, retailerId, , prodId] = key.split("|");
+    if (bestProduct.get(`${itemId}|${retailerId}`) !== prodId) weeklyMap.delete(key);
+  }
+
 
   const points: PricePoint[] = [];
   const pairWeekCounts = new Map<string, number>();

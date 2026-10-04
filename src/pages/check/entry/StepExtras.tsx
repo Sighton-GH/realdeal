@@ -1,18 +1,25 @@
+import { useState } from "react";
 import type { Item, RetailerId } from "@shared/types";
-import { retailerById } from "@shared/retailers";
+import { RETAILERS, retailerById } from "@shared/retailers";
 import { StoreTile } from "@/components/ui/StoreTile";
 import { PriceText } from "@/components/ui/PriceText";
 import { Toggle } from "@/components/ui/Toggle";
 import { TextField } from "@/components/ui/TextField";
 import { Stepper } from "@/components/ui/Stepper";
 import { Button } from "@/components/ui/Button";
-import { formatMoney } from "@/lib/format";
+import { useAppStore } from "@/store/useAppStore";
+import { formatMoney, formatUnitPrice } from "@/lib/format";
+import { toItemSizeQty } from "./entryState";
+import { Sheet } from "@/components/ui/Sheet";
+import type { ItemSizeOption } from "@/lib/itemSizes";
 import { parsePriceInput } from "./PriceKeypad";
 
 export interface StepExtrasProps {
   item: Item;
   retailerId: RetailerId;
+  onSelectRetailer?: (id: RetailerId) => void;
   price: string;
+  selectedSize?: ItemSizeOption;
   hasWasPrice: boolean;
   setHasWasPrice: (v: boolean) => void;
   wasPrice: string;
@@ -27,7 +34,7 @@ export interface StepExtrasProps {
   setHasCustomSize: (v: boolean) => void;
   customSize: string;
   setCustomSize: (v: string) => void;
-  onJumpStep: (step: 1 | 2) => void;
+  onJumpStep: (step: 1) => void;
   onSubmit: () => void;
   loading: boolean;
 }
@@ -35,7 +42,9 @@ export interface StepExtrasProps {
 export function StepExtras({
   item,
   retailerId,
+  onSelectRetailer,
   price,
+  selectedSize,
   hasWasPrice,
   setHasWasPrice,
   wasPrice,
@@ -54,6 +63,8 @@ export function StepExtras({
   onSubmit,
   loading,
 }: StepExtrasProps) {
+  const mode = useAppStore((s) => s.priceDisplay);
+  const [storeSheetOpen, setStoreSheetOpen] = useState(false);
   const retailer = retailerById(retailerId);
   const parsedPrice = parsePriceInput(price);
 
@@ -77,6 +88,9 @@ export function StepExtras({
   const sizeNum = Number.parseFloat(customSize);
   const isSizeValid = !hasCustomSize || (customSize.trim().length > 0 && Number.isFinite(sizeNum) && sizeNum > 0);
 
+  const sizeQty = hasCustomSize ? toItemSizeQty(customSize, item.unit) : item.sizeQty;
+  const comparisonUnitPrice = sizeQty ? (hasMultiBuy && unitPriceEach !== null ? unitPriceEach : parsedPrice) / sizeQty : undefined;
+
   const canSubmit = isWasValid && isMultiBuyValid && isSizeValid && !loading;
 
   const sizeSuffix = item.unit === "kg" ? "g" : item.unit === "L" ? "mL" : "pack";
@@ -92,25 +106,40 @@ export function StepExtras({
       </h2>
 
       {/* Summary row */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-2">
         <StoreTile
           retailer={retailer}
           size="md"
-          onClick={() => onJumpStep(1)}
+          onClick={() => setStoreSheetOpen(true)}
           className="cursor-pointer"
         />
         <button
           type="button"
-          onClick={() => onJumpStep(2)}
-          className="press flex min-h-18 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-line bg-canvas p-3 [--lip:var(--color-line-strong)]"
+          onClick={() => onJumpStep(1)}
+          className="press flex min-h-18 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-line bg-canvas p-2 text-center [--lip:var(--color-line-strong)]"
           aria-label="Change price"
         >
-          <span className="text-small font-bold text-ink-soft">
+          <span className="text-micro font-bold text-ink-soft">
             Shelf price
           </span>
-          <PriceText amount={parsedPrice} size="lg" />
+          <PriceText amount={parsedPrice} size="md" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onJumpStep(1)}
+          className="press flex min-h-18 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-line bg-canvas p-2 text-center [--lip:var(--color-line-strong)]"
+          aria-label="Change package size"
+        >
+          <span className="text-micro font-bold text-ink-soft">
+            Size
+          </span>
+          <span className="font-display text-small font-extrabold text-ink truncate">
+            {selectedSize?.label ?? item.sizeLabel}
+          </span>
         </button>
       </div>
+
+      {mode === "unit" && comparisonUnitPrice !== undefined && <p className="text-center text-body font-extrabold">Comparison price: {formatUnitPrice(comparisonUnitPrice, item.unit)}</p>}
 
       {/* Toggles */}
       <div className="flex flex-col divide-y divide-line rounded-md border-2 border-line bg-canvas p-3">
@@ -210,6 +239,24 @@ export function StepExtras({
           Check price
         </Button>
       </div>
+
+      {/* Store Selection Sheet */}
+      <Sheet open={storeSheetOpen} onClose={() => setStoreSheetOpen(false)} title="Which store?">
+        <div className="grid grid-cols-2 gap-3 py-2">
+          {RETAILERS.map((r) => (
+            <StoreTile
+              key={r.id}
+              retailer={r}
+              size="md"
+              selected={retailerId === r.id}
+              onClick={() => {
+                onSelectRetailer?.(r.id);
+                setStoreSheetOpen(false);
+              }}
+            />
+          ))}
+        </div>
+      </Sheet>
     </div>
   );
 }

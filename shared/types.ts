@@ -1,9 +1,9 @@
 // shared/types.ts: FROZEN contract. Change only via BLOCKERS.md and update every consumer.
 export type RetailerId = "saveon" | "nofrills" | "walmart" | "tnt" | "loblaws" | "metro" | "voila" | "galleria";
-export type TileColour = "tangerine" | "pink" | "teal" | "violet";
+export type TileColour = "tangerine" | "pink" | "teal" | "violet" | "berry" | "forest" | "indigo" | "slate";
 export interface Retailer { id: RetailerId; name: string; shortName: string; tile: TileColour; website: string; }
 
-export type Category = "produce" | "dairy" | "bakery" | "pantry";
+export type Category = "produce" | "dairy" | "bakery" | "pantry" | "meat" | "seafood" | "frozen" | "snacks" | "drinks" | "household";
 export type Unit = "kg" | "L" | "each" | "dozen";
 export type ArtKey =
   | "milk" | "eggs" | "butter" | "cheese" | "yogurt" | "sourcream" | "flour" | "bread" | "bagel"

@@ -3,16 +3,21 @@ import { retailerById } from "@shared/retailers";
 import { ItemArt } from "@/components/art";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { formatMoney } from "@/lib/format";
+import { useAppStore } from "@/store/useAppStore";
+import { unitPriceOf } from "@shared/verdict";
+import { formatMoney, formatUnitPrice } from "@/lib/format";
 
 export interface FlyerDealCardProps { deal: FeaturedDeal; onCheck: (deal: FeaturedDeal) => void; loading?: boolean; className?: string }
 
 // Keep complete class names visible to Tailwind's scanner.
 const storeDot: Record<TileColour, string> = {
   tangerine: "bg-tangerine", pink: "bg-pink", teal: "bg-teal", violet: "bg-violet",
+  berry: "bg-berry", forest: "bg-forest", indigo: "bg-indigo", slate: "bg-slate",
 };
 
 export function FlyerDealCard({ deal, onCheck, loading, className }: FlyerDealCardProps) {
+  const priceDisplay = useAppStore((s) => s.priceDisplay);
+  const normalizedPrice = unitPriceOf(deal.price, deal.sizeQty ?? deal.item.sizeQty, deal.multiBuy);
   const retailer = retailerById(deal.retailerId);
   const amount = formatMoney(deal.multiBuy ? deal.multiBuy.total : deal.price);
   const [dollars, cents] = amount.split(".");
@@ -46,6 +51,7 @@ export function FlyerDealCard({ deal, onCheck, loading, className }: FlyerDealCa
           </p>
         </div>
       </div>
+      {priceDisplay === "unit" && <p className="text-body font-extrabold">{formatUnitPrice(normalizedPrice, deal.item.unit)}</p>}
       <p className="text-small font-bold text-ink-soft">{deal.tagline}</p>
       <Button size="md" fullWidth loading={loading} className="mt-auto" onClick={() => onCheck(deal)}>Check it</Button>
     </article>

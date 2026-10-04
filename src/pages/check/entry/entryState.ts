@@ -1,11 +1,11 @@
 import type { Item, RetailerId, Unit } from "@shared/types";
 import { RETAILERS } from "@shared/retailers";
 
-export type EntryStep = 1 | 2 | 3;
+export type EntryStep = 1 | 2;
 
 export interface EntryFormState {
   step: EntryStep;
-  retailerId: RetailerId | null;
+  retailerId: RetailerId;
   price: string;
   hasWasPrice: boolean;
   wasPrice: string;
@@ -42,7 +42,8 @@ export function parseInitialEntryState(
   item?: Item,
 ): EntryFormState {
   const storeParam = params.get("store") as RetailerId | null;
-  const validStore = storeParam && RETAILERS.some((r) => r.id === storeParam) ? storeParam : null;
+  const validStore: RetailerId =
+    storeParam && RETAILERS.some((r) => r.id === storeParam) ? storeParam : "saveon";
 
   const priceParam = params.get("price") ?? "";
   const wasParam = params.get("was") ?? "";
@@ -57,14 +58,13 @@ export function parseInitialEntryState(
   const hasMultiBuy = Boolean(mbtParam);
   const hasCustomSize = Boolean(sizeParam) && unit !== "dozen";
 
-  // Determine step: if step param is provided, use it; else if store & price present -> 3; else if store -> 2; else 1
+  // Step 1: Price entry (store selection pane removed)
+  // Step 2: Extras & Confirmation
   const stepParam = params.get("step");
   let step: EntryStep = 1;
-  if (stepParam === "1" || stepParam === "2" || stepParam === "3") {
-    step = Number.parseInt(stepParam, 10) as EntryStep;
-  } else if (validStore && priceParam && Number.parseFloat(priceParam) > 0) {
-    step = 3;
-  } else if (validStore) {
+  if (stepParam === "2" || stepParam === "3") {
+    step = 2;
+  } else if (priceParam && Number.parseFloat(priceParam) > 0) {
     step = 2;
   }
 

@@ -3,15 +3,24 @@ import { CaretRight } from "@phosphor-icons/react";
 import type { Item } from "@shared/types";
 import { ItemArt } from "@/components/art";
 import { cn } from "@/lib/cn";
+import { formatAvailableSizesSummary } from "@/lib/itemSizes";
 
-export interface ItemRowProps { item: Item; right?: ReactNode; onClick?: () => void; className?: string }
+export interface ItemRowProps {
+  item: Item;
+  right?: ReactNode;
+  onClick?: () => void;
+  className?: string;
+}
 
 export function ItemRow({ item, right, onClick, className }: ItemRowProps) {
+  const sizeSummary = formatAvailableSizesSummary(item);
   const content = <>
     <ItemArt artKey={item.artKey} size={48} />
     <span className="min-w-0 flex-1">
       <span className="block truncate font-body text-h3 font-extrabold">{item.name}</span>
-      <span className="block text-small font-bold text-ink-soft">{item.sizeLabel}</span>
+      <span className="block truncate text-small font-bold text-ink-soft">
+        Sizes: {sizeSummary}
+      </span>
     </span>
     {right != null && <span className="shrink-0">{right}</span>}
     {onClick && <CaretRight aria-hidden="true" size={20} weight="bold" className="shrink-0 text-ink-soft" />}

@@ -138,7 +138,7 @@ function handleSample(sampleId: string, store: PriceStore): ScanResult | null {
  */
 function mapRetailer(storeName?: string | null): RetailerId | undefined {
   if (!storeName) return undefined;
-  const s = storeName.toLowerCase();
+  const s = storeName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   if (s.includes("save-on") || s.includes("save on") || s.includes("saveon")) {
     return "saveon";
   }
@@ -148,13 +148,13 @@ function mapRetailer(storeName?: string | null): RetailerId | undefined {
   if (s.includes("walmart")) {
     return "walmart";
   }
-  if (s.includes("t&t") || s.includes("t & t") || s.includes("tnt")) {
+  if (s.includes("t&t") || s.includes("t & t") || s.includes("tnt") || s.includes("tandt") || s.includes("t and t")) {
     return "tnt";
   }
-  if (s.includes("loblaws")) return "loblaws";
-  if (s.includes("metro")) return "metro";
-  if (s.includes("voila") || s.includes("voilà")) return "voila";
-  if (s.includes("galleria")) return "galleria";
+  if (/\bloblaws?\b/.test(s)) return "loblaws";
+  if (/\bmetro\b/.test(s)) return "metro";
+  if (/\bvoila\b/.test(s)) return "voila";
+  if (/\bgalleria\b/.test(s)) return "galleria";
   return undefined;
 }
 

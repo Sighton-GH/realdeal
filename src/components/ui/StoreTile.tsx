@@ -8,6 +8,10 @@ export const tileClass: Record<TileColour, string> = {
   tangerine: "bg-tangerine [--lip:var(--color-tangerine-lip)]",
   pink: "bg-pink [--lip:var(--color-pink-lip)]",
   teal: "bg-teal [--lip:var(--color-teal-lip)]",
+  berry: "bg-berry [--lip:var(--color-berry-lip)]",
+  forest: "bg-forest [--lip:var(--color-forest-lip)]",
+  indigo: "bg-indigo [--lip:var(--color-indigo-lip)]",
+  slate: "bg-slate [--lip:var(--color-slate-lip)]",
   violet: "bg-violet [--lip:var(--color-violet-lip)]",
 };
 
@@ -36,6 +40,14 @@ function Glyph({ colour, px }: { colour: TileColour; px: number }) {
           <polygon points="12,2.5 20.2,7.25 20.2,16.75 12,21.5 3.8,16.75 3.8,7.25" fill="currentColor" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
         </svg>
       );
+    case "berry":
+      return <svg {...common}><path d="M12 2 22 12 12 22 2 12Z" fill="currentColor" /></svg>;
+    case "forest":
+      return <svg {...common}><path d="M12 2 23 21H1Z" fill="currentColor" /></svg>;
+    case "indigo":
+      return <svg {...common}><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="5" /></svg>;
+    case "slate":
+      return <svg {...common}><path d="M8 2h8v6h6v8h-6v6H8v-6H2V8h6Z" fill="currentColor" /></svg>;
     case "violet":
       // squircle
       return (

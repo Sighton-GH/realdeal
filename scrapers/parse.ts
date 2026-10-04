@@ -14,7 +14,13 @@ import type { MultiBuy, Unit } from "../shared/types";
  */
 export function parseSize(text: string): { qty: number; unit: Unit } | null {
   if (!text) return null;
-  const t = text.toLowerCase().replace(",", ".");
+  const t = text.toLowerCase().replace(",", ".")
+    .replace(/\bmillilit(?:re|er)s?\b/g, "ml")
+    .replace(/\bkilograms?\b/g, "kg")
+    .replace(/\bgrams?\b/g, "g")
+    .replace(/\blit(?:re|er)s?\b/g, "l")
+    .replace(/\bpounds?\b/g, "lb")
+    .replace(/\ballpurpose\b/g, "all purpose");
 
   // Multipacks with an explicit unit: "2 x 454 g" is 0.908 kg, "12 x 355 mL" is 4.26 L ("12 x 1" is handled below)
   const multipack = t.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?\s*(?:kg|g|ml|l)\b)/);
@@ -31,13 +37,11 @@ export function parseSize(text: string): { qty: number; unit: Unit } | null {
     return { qty: 1, unit: "kg" };
   }
 
-  // Eggs / Dozen
-  if (/(?:^|\s)12\s*eggs\b/.test(t) || /\bdozen\b/.test(t) || /\b1\s*dozen\b/.test(t)) {
-    return { qty: 1, unit: "dozen" };
-  }
+  // Quantity must be read before the generic "dozen" marker (2 dozen is not 1).
   const dozenMatch = t.match(/(\d+(?:\.\d+)?)\s*dozen\b/);
-  if (dozenMatch) {
-    return { qty: Number(dozenMatch[1]), unit: "dozen" };
+  if (dozenMatch) return { qty: Number(dozenMatch[1]), unit: "dozen" };
+  if (/(?:^|\s)12\s*eggs\b/.test(t) || /\bdozen\b/.test(t)) {
+    return { qty: 1, unit: "dozen" };
   }
 
   // Pack / count / each
@@ -45,11 +49,11 @@ export function parseSize(text: string): { qty: number; unit: Unit } | null {
   if (multiCountMatch) {
     return { qty: Number(multiCountMatch[1]), unit: "each" };
   }
-  const packMatch = t.match(/(\d+(?:\.\d+)?)\s*(?:pack|pk|ct|count|each|ea)\b/);
+  const packMatch = t.match(/(\d+(?:\.\d+)?)\s*(?:per pack|pack|pk|ct|count|each|ea|pc|pieces|un|rolls)\b/);
   if (packMatch) {
     return { qty: Number(packMatch[1]), unit: "each" };
   }
-  if (/\b(?:each|ea|\/ea|\/each)\b/.test(t) && !/\d+\s*(?:pack|pk|ct|count|each|ea)\b/.test(t)) {
+  if (/\b(?:each|ea|\/ea|\/each)\b/.test(t) && !/\d+\s*(?:per pack|pack|pk|ct|count|each|ea|pc|pieces|un|rolls)\b/.test(t)) {
     return { qty: 1, unit: "each" };
   }
 

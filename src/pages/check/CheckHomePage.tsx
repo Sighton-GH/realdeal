@@ -9,6 +9,7 @@ import { useTopBar } from "@/components/layout";
 import { Penny } from "@/components/penny";
 import { Button, Chip, EmptyState, LinkButton, PriceText, SearchField, Section, Sheet, Skeleton, SpeechBubble, VerdictBadge } from "@/components/ui";
 import { DataFreshness, FlyerDealCard, ItemRow } from "@/components/domain";
+import { displayedPrice } from "@/lib/priceDisplay";
 import { useRunCheck } from "./useRunCheck";
 import { useDebouncedValue } from "./home/useDebouncedValue";
 
@@ -17,6 +18,13 @@ const CATEGORIES: Array<{ label: string; value: Category }> = [
   { label: "Produce", value: "produce" },
   { label: "Bakery", value: "bakery" },
   { label: "Pantry", value: "pantry" },
+  { label: "Meat", value: "meat" },
+  { label: "Seafood", value: "seafood" },
+  { label: "Frozen", value: "frozen" },
+  { label: "Snacks", value: "snacks" },
+  { label: "Drinks", value: "drinks" },
+  { label: "Household", value: "household" },
+
 ];
 
 export function CheckHomePage() {
@@ -38,6 +46,7 @@ export function CheckHomePage() {
   });
   const featured = useQuery({ queryKey: ["featured"], queryFn: () => api.getFeatured() });
   const { run } = useRunCheck();
+  const priceDisplay = useAppStore((s) => s.priceDisplay);
   const recentChecks = useAppStore((s) => s.recentChecks);
   const clearChecks = useAppStore((s) => s.clearChecks);
   const recent = recentChecks.slice(0, 5);
@@ -180,7 +189,7 @@ export function CheckHomePage() {
                     right={
                       <span className="flex shrink-0 flex-col items-end gap-1.5">
                         <VerdictBadge tier={check.tier} size="sm" />
-                        <PriceText amount={check.input.price} size="sm" />
+                        <PriceText {...displayedPrice(check.input.price, check.unitPrice, check.item, priceDisplay)} size="sm" />
                       </span>
                     }
                   />

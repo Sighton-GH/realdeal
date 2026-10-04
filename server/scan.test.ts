@@ -387,3 +387,20 @@ describe("scanWithGemini timeouts", () => {
     expect(used).toEqual([K(1), K(2), K(3)]);
   });
 });
+
+describe("scan store-name coverage", () => {
+  const store = generateSeedStore();
+  it.each([
+    ["SaveOnFoods", "saveon"], ["Save-On-Foods", "saveon"],
+    ["NoFrills", "nofrills"], ["No Frills", "nofrills"],
+    ["Walmart Canada", "walmart"], ["T&T Supermarket", "tnt"],
+    ["TandT", "tnt"], ["T and T", "tnt"],
+    ["Loblaws", "loblaws"], ["Metro", "metro"],
+    ["Voilà by Sobeys", "voila"], ["Voila", "voila"],
+    ["Galleria Supermarket", "galleria"],
+    ["Unknown Grocer", undefined], ["Metropolitan Grocer", undefined],
+  ])("recognizes %s without guessing an unknown chain", (storeName, retailerId) => {
+    const result = postProcess({ productName: "Salted Butter", sizeText: "454 g", price: 5.99, storeName }, store);
+    expect(result.retailerId).toBe(retailerId);
+  });
+});
