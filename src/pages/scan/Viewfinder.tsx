@@ -19,15 +19,13 @@ export interface ViewfinderProps {
   onPickPhoto: () => void;
   onTypeIt: () => void;
   onTrySample: () => void;
-  /** the store hint row, rendered above the controls */
-  hint: React.ReactNode;
 }
 
 const CAMERA_FAILED: CameraState[] = ["denied", "unavailable", "insecure"];
 
 export function Viewfinder({
   videoRef, cameraState, guide, torchSupported, torchOn, onToggleTorch,
-  onClose, onShutter, onPickPhoto, onTypeIt, onTrySample, hint,
+  onClose, onShutter, onPickPhoto, onTypeIt, onTrySample,
 }: ViewfinderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const failed = CAMERA_FAILED.includes(cameraState);
@@ -89,7 +87,6 @@ export function Viewfinder({
       )}
 
       <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-        {!failed && hint}
         <div className="grid grid-cols-3 items-center px-5">
           <button type="button" onClick={onPickPhoto} className="flex min-h-12 flex-col items-center gap-1 justify-self-start text-small font-extrabold text-white">
             <Image size={28} weight="bold" />
