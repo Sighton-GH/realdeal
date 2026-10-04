@@ -13,10 +13,17 @@ export interface UseCamera {
   toggleTorch: () => Promise<void>;
   canSwitch: boolean;
   switchCamera: () => Promise<void>;
+  focusSupported: boolean;
+  focusAt: (p: { x: number; y: number }) => Promise<boolean>;
 }
 
 interface TorchCapabilities {
   torch?: boolean;
+}
+
+interface FocusCapabilities {
+  focusMode?: string[];
+  exposureMode?: string[];
 }
 
 interface TorchConstraintSet {
@@ -37,10 +44,12 @@ export function useCamera(): UseCamera {
   const deviceIdsRef = useRef<string[]>([]);
   const deviceIndexRef = useRef(-1);
   const torchOnRef = useRef(false);
+  const focusCapsRef = useRef<{ focusModes: string[]; exposureModes: string[] } | null>(null);
 
   const [state, setState] = useState<CameraState>("idle");
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
+  const [focusSupported, setFocusSupported] = useState(false);
   const [canSwitch, setCanSwitch] = useState(false);
 
   const invalidateRequests = useCallback(() => {
@@ -61,6 +70,11 @@ export function useCamera(): UseCamera {
     setTorchSupported(false);
   }, []);
 
+  const resetFocus = useCallback(() => {
+    focusCapsRef.current = null;
+    setFocusSupported(false);
+  }, []);
+
   const open = useCallback(
     async (deviceId?: string): Promise<void> => {
       if (!window.isSecureContext) {
@@ -75,6 +89,7 @@ export function useCamera(): UseCamera {
       const request = ++requestRef.current;
       releaseStream();
       resetTorch();
+      resetFocus();
       wantLiveRef.current = true;
       setState("starting");
 
@@ -114,8 +129,12 @@ export function useCamera(): UseCamera {
       }
 
       const track = stream.getVideoTracks()[0];
-      const caps = track?.getCapabilities?.() as TorchCapabilities | undefined;
+      const caps = track?.getCapabilities?.() as (TorchCapabilities & FocusCapabilities) | undefined;
       setTorchSupported(Boolean(caps?.torch));
+      const focusModes = caps?.focusMode ?? [];
+      const exposureModes = caps?.exposureMode ?? [];
+      focusCapsRef.current = { focusModes, exposureModes };
+      setFocusSupported(Boolean(focusModes.length || exposureModes.length));
       setState("live");
 
       // Device labels and ids are only reliable after permission has been granted.
@@ -131,7 +150,7 @@ export function useCamera(): UseCamera {
         setCanSwitch(false);
       }
     },
-    [releaseStream, resetTorch],
+    [releaseStream, resetTorch, resetFocus],
   );
 
   const start = useCallback(() => open(), [open]);
@@ -141,8 +160,9 @@ export function useCamera(): UseCamera {
     wantLiveRef.current = false;
     releaseStream();
     resetTorch();
+    resetFocus();
     if (mountedRef.current) setState("idle");
-  }, [releaseStream, resetTorch, invalidateRequests]);
+  }, [releaseStream, resetTorch, resetFocus, invalidateRequests]);
 
   const toggleTorch = useCallback(async () => {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -165,6 +185,25 @@ export function useCamera(): UseCamera {
     deviceIndexRef.current = nextIndex;
     await open(ids[nextIndex]);
   }, [open]);
+
+  const focusAt = useCallback(async (p: { x: number; y: number }) => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    const caps = focusCapsRef.current;
+    if (!track || !caps) return false;
+    const pick = (modes: string[]) => (modes.includes("continuous") ? "continuous" : modes.includes("single-shot") ? "single-shot" : undefined);
+    const set: Record<string, unknown> = { pointsOfInterest: [p] };
+    const focusMode = pick(caps.focusModes);
+    const exposureMode = pick(caps.exposureModes);
+    if (focusMode) set.focusMode = focusMode;
+    if (exposureMode) set.exposureMode = exposureMode;
+    if (!focusMode && !exposureMode) return false;
+    try {
+      await track.applyConstraints({ advanced: [set] } as unknown as MediaTrackConstraints);
+      return true;
+    } catch {
+      return false; // the camera refused: leave it as it was
+    }
+  }, []);
 
   // Mount/unmount. Setting mountedRef in the effect (not at init) keeps StrictMode's
   // mount, cleanup, mount sequence correct.
@@ -198,5 +237,5 @@ export function useCamera(): UseCamera {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [open, stop]);
 
-  return { videoRef, state, start, stop, torchSupported, torchOn, toggleTorch, canSwitch, switchCamera };
+  return { videoRef, state, start, stop, torchSupported, torchOn, toggleTorch, canSwitch, switchCamera, focusSupported, focusAt };
 }
