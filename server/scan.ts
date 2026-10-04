@@ -1,5 +1,5 @@
 import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
-import { classifyGeminiError, cooldownMsFor, getKeyPool, type KeyPool } from "./geminiKeys";
+import { classifyGeminiError, cooldownMsFor, getKeyPool, isDailyQuotaError, type KeyPool } from "./geminiKeys";
 import { rankItems } from "../scrapers/match";
 import { parseMultiBuy, parsePrice } from "../scrapers/parse";
 import { parseTagAmount, sameAmount, toItemUnits } from "../shared/units";
@@ -266,7 +266,13 @@ export function postProcess(raw: RawGeminiExtraction, store: PriceStore): ScanRe
  * Reads a shelf tag image with Gemini Flash and returns a ScanResult matched to the catalogue.
  */
 /** One Gemini call with a specific key. Returns the model's JSON text. */
-export async function generateWithKey(apiKey: string, modelName: string, image: ScanImageInput, signal?: AbortSignal): Promise<string | undefined> {
+export async function generateWithKey(
+  apiKey: string,
+  modelName: string,
+  image: ScanImageInput,
+  signal?: AbortSignal,
+  onTokens?: (tokens: number) => void,
+): Promise<string | undefined> {
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: modelName,
@@ -283,12 +289,19 @@ export async function generateWithKey(apiKey: string, modelName: string, image: 
       responseSchema: RESPONSE_SCHEMA,
     },
   });
+  onTokens?.(response.usageMetadata?.totalTokenCount ?? 0);
   return response.text;
 }
 
 export interface ScanDeps {
   /** replace the network call (tests) */
-  generate?: (apiKey: string, modelName: string, image: ScanImageInput, signal?: AbortSignal) => Promise<string | undefined>;
+  generate?: (
+    apiKey: string,
+    modelName: string,
+    image: ScanImageInput,
+    signal?: AbortSignal,
+    onTokens?: (tokens: number) => void,
+  ) => Promise<string | undefined>;
   /** replace the shared key pool (tests) */
   pool?: KeyPool;
   sleep?: (ms: number) => Promise<void>;
@@ -305,6 +318,8 @@ const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
 const ATTEMPT_TIMEOUT_MS = 12_000;
 const TOTAL_TIMEOUT_MS = 40_000;
 const MIN_ATTEMPT_MS = 2_000;
+// When every key is full for the minute but one frees up this soon, wait for it rather than failing the scan
+const MAX_WAIT_FOR_KEY_MS = 10_000;
 
 class AttemptTimeout extends Error {
   constructor(ms: number) {
@@ -360,14 +375,30 @@ async function callWithRotation(
   let retries503 = 0;
   let timeouts = 0;
   let lastFailure: ScanFailed["kind"] | null = null;
-  // at most one pass over every key, plus the 503 retries
-  for (let attempt = 0; attempt < pool.size + 2; attempt++) {
-    const remaining = deadline - Date.now();
+  let waitedForKey = false;
+  // at most one pass over every key, plus the 503 retries and one wait for a key to free up
+  for (let attempt = 0; attempt < pool.size + 3; attempt++) {
+    let remaining = deadline - Date.now();
     if (lastFailure && remaining < Math.min(MIN_ATTEMPT_MS, attemptMs)) break; // no time left for another real try
-    const slot = pool.acquire();
+    let slot = pool.acquire();
+    if (!slot && !waitedForKey) {
+      // Every key is full for this minute; if one frees up in a few seconds, waiting beats failing the scan
+      const wait = pool.waitMs();
+      if (wait !== null && wait <= MAX_WAIT_FOR_KEY_MS && wait + MIN_ATTEMPT_MS < remaining) {
+        waitedForKey = true;
+        console.warn(`[Gemini] every key is at its per-minute limit; waiting ${Math.ceil(wait / 1000)}s for one to free up`);
+        await sleep(wait + 50);
+        remaining = deadline - Date.now();
+        slot = pool.acquire();
+      }
+    }
     if (!slot) break;
+    const key = slot;
     try {
-      return await withTimeout((signal) => generate(slot.key, modelName, image, signal), Math.min(attemptMs, Math.max(remaining, 1)));
+      return await withTimeout(
+        (signal) => generate(key.key, modelName, image, signal, (tokens) => pool.recordTokens(key, tokens)),
+        Math.min(attemptMs, Math.max(remaining, 1)),
+      );
     } catch (err) {
       if (err instanceof AttemptTimeout) {
         lastFailure = "timeout";
@@ -377,9 +408,14 @@ async function callWithRotation(
       }
       const kind = classifyGeminiError(err);
       if (kind === "rate_limit") {
-        const ms = cooldownMsFor(err);
-        pool.bench(slot, ms);
-        console.warn(`[Gemini] key ${slot.label} rate limited, resting ${Math.round(ms / 1000)}s; trying the next key`);
+        if (isDailyQuotaError(err)) {
+          pool.markDayFull(slot);
+          console.warn(`[Gemini] key ${slot.label} is out of requests for today; skipping it until midnight Pacific`);
+        } else {
+          const ms = cooldownMsFor(err);
+          pool.bench(slot, ms);
+          console.warn(`[Gemini] key ${slot.label} rate limited, resting ${Math.round(ms / 1000)}s; trying the next key`);
+        }
         continue;
       }
       if (kind === "bad_key") {

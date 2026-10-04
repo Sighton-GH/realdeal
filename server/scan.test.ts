@@ -257,6 +257,32 @@ describe("scanWithGemini key rotation", () => {
     expect(used).toEqual([K(1), K(2), K(3), K(1), K(2), K(3)]);
   });
 
+  it("marks a key full for the day when Google says its daily quota is gone", async () => {
+    const used: string[] = [];
+    const pool = new KeyPool([K(1), K(2)]);
+    const daily = () => new Error('{"error":{"code":429,"status":"RESOURCE_EXHAUSTED","message":"GenerateRequestsPerDayPerProjectPerModel-FreeTier"}}');
+    const generate = async (key: string) => { used.push(key); if (key === K(1)) throw daily(); return tag; };
+    await scanWithGemini(image, undefined, store, { pool, sleep: noSleep, generate });
+    await scanWithGemini(image, undefined, store, { pool, sleep: noSleep, generate });
+    expect(used).toEqual([K(1), K(2), K(2)]);
+    expect(pool.status()[0].state).toBe("day_full");
+  });
+
+  it("never sends a request on a key that is already full for the minute", async () => {
+    const used: string[] = [];
+    const pool = new KeyPool([K(1), K(2)], { rpm: 1, rpd: 20, tpm: 250_000 });
+    pool.acquire(); // K1 used its one request this minute
+    const r = await scanWithGemini(image, undefined, store, { pool, sleep: noSleep, generate: async (key) => { used.push(key); return tag; } });
+    expect(r.status).toBe("ok");
+    expect(used).toEqual([K(2)]);
+  });
+
+  it("records the tokens each scan used against its key", async () => {
+    const pool = new KeyPool([K(1)], { rpm: 5, rpd: 20, tpm: 1000 });
+    await scanWithGemini(image, undefined, store, { pool, sleep: noSleep, generate: async (_k, _m, _i, _s, onTokens) => { onTokens?.(1000); return tag; } });
+    expect(pool.status()[0].state).toBe("minute_full");
+  });
+
   it("switches off a key Google rejects and carries on", async () => {
     const pool = new KeyPool([K(1), K(2)]);
     const r = await scanWithGemini(image, undefined, store, {

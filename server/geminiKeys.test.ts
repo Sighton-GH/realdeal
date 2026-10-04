@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { KeyPool, classifyGeminiError, cooldownMsFor, parseKeys } from "./geminiKeys";
+import { KeyPool, classifyGeminiError, cooldownMsFor, msUntilQuotaReset, parseKeys, parseLimits, quotaDay, type UsageStore } from "./geminiKeys";
 
 const K = (n: number) => `AQ.testkey${String(n).padStart(2, "0")}_abcdefghijklmnop`;
 
@@ -74,5 +74,80 @@ describe("KeyPool", () => {
     pool.disable(pool.acquire()!);
     expect(pool.waitMs()).toBeNull();
     expect(JSON.stringify(pool.status())).not.toContain(K(1));
+  });
+});
+
+describe("KeyPool limits", () => {
+  // 2026-10-04 10:00 Pacific (17:00 UTC)
+  const T = Date.UTC(2026, 9, 4, 17, 0, 0);
+  const limits = { rpm: 5, rpd: 20, tpm: 250_000 };
+
+  it("reads limits from the environment, falling back to the free-tier defaults", () => {
+    expect(parseLimits({} as NodeJS.ProcessEnv)).toEqual(limits);
+    expect(parseLimits({ GEMINI_RPM: "10", GEMINI_RPD: "abc" } as NodeJS.ProcessEnv)).toEqual({ ...limits, rpm: 10 });
+  });
+
+  it("marks a key full for the minute after 5 requests and hands it out again a minute later", () => {
+    const pool = new KeyPool([K(1)], limits, undefined, T);
+    for (let i = 0; i < 5; i++) expect(pool.acquire(T + i)).not.toBeNull();
+    expect(pool.acquire(T + 10)).toBeNull();
+    expect(pool.status(T + 10)[0].state).toBe("minute_full");
+    expect(pool.waitMs(T + 10)).toBe(60_000 - 10);
+    expect(pool.acquire(T + 60_001)).not.toBeNull();
+  });
+
+  it("prefers the key with the most room left", () => {
+    const pool = new KeyPool([K(1), K(2), K(3)], limits, undefined, T);
+    pool.acquire(T); // K1
+    pool.acquire(T); // K2
+    pool.acquire(T); // K3
+    pool.acquire(T); // K1
+    pool.acquire(T); // K2
+    expect(pool.acquire(T)!.key).toBe(K(3));
+  });
+
+  it("marks a key full for the day after 20 requests, until midnight Pacific", () => {
+    const pool = new KeyPool([K(1), K(2)], limits, undefined, T);
+    for (let i = 0; i < 40; i++) expect(pool.acquire(T + i * 61_000)).not.toBeNull();
+    const later = T + 40 * 61_000; // still the same Pacific day
+    expect(pool.acquire(later)).toBeNull();
+    expect(pool.status(later).map((s) => s.state)).toEqual(["day_full", "day_full"]);
+    expect(pool.waitMs(later)).toBe(msUntilQuotaReset(later));
+    const nextDay = Date.UTC(2026, 9, 5, 7, 1, 0); // 00:01 Pacific
+    expect(pool.acquire(nextDay)).not.toBeNull();
+  });
+
+  it("knows when the Pacific day changes", () => {
+    expect(quotaDay(T)).toBe("2026-10-04");
+    expect(quotaDay(Date.UTC(2026, 9, 5, 6, 59))).toBe("2026-10-04");
+    expect(quotaDay(Date.UTC(2026, 9, 5, 7, 0))).toBe("2026-10-05");
+    expect(msUntilQuotaReset(T)).toBe(14 * 3_600_000);
+  });
+
+  it("marks a key full when Google says its daily quota is gone", () => {
+    const pool = new KeyPool([K(1), K(2)], limits, undefined, T);
+    pool.markDayFull(pool.acquire(T)!, T);
+    expect(pool.status(T)[0].state).toBe("day_full");
+    expect(pool.acquire(T + 1)!.key).toBe(K(2));
+  });
+
+  it("marks a key full when it has used its tokens for the minute", () => {
+    const pool = new KeyPool([K(1), K(2)], limits, undefined, T);
+    pool.recordTokens(pool.acquire(T)!, 250_000, T);
+    expect(pool.status(T + 1)[0].state).toBe("minute_full");
+    expect(pool.acquire(T + 1)!.key).toBe(K(2));
+    expect(pool.acquire(T + 2)!.key).toBe(K(2));
+  });
+
+  it("remembers today's counts across restarts without storing the keys", () => {
+    let saved: Record<string, { day: string; count: number }> = {};
+    const store: UsageStore = { load: () => saved, save: (d) => { saved = d; } };
+    const first = new KeyPool([K(1), K(2)], limits, store, T);
+    for (let i = 0; i < 20; i++) first.acquire(T + i * 61_000);
+    expect(JSON.stringify(saved)).not.toContain(K(1));
+    const restarted = new KeyPool([K(1), K(2)], limits, store, T + 30 * 61_000);
+    expect(restarted.status(T + 30 * 61_000).map((s) => s.usedToday)).toEqual([10, 10]);
+    const tomorrow = new KeyPool([K(1), K(2)], limits, store, Date.UTC(2026, 9, 5, 8));
+    expect(tomorrow.status(Date.UTC(2026, 9, 5, 8)).map((s) => s.usedToday)).toEqual([0, 0]);
   });
 });
