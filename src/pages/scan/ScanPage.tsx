@@ -20,6 +20,7 @@ type Request = { blob: Blob | null; sampleId?: SampleId };
 
 const NO_PRICE = "Penny couldn't find a price in that photo. Try a closer shot of the tag, or type it in.";
 const READ_ERROR = "Couldn't read that photo right now.";
+const TIMED_OUT = "The scan timed out: the server took too long to answer. Try again in a moment.";
 const CAMERA_DENIED = "RealDeal needs the camera to read price tags. Allow camera access in your browser settings, or pick a photo instead.";
 const CAMERA_MISSING = "Your camera isn't available here. Pick a photo instead, or try a sample tag.";
 
@@ -38,6 +39,7 @@ export function ScanPage() {
   const [photo, setPhoto] = useState<{ url: string; owned: boolean } | null>(null);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [failure, setFailure] = useState<"no_price" | "error">("error");
+  const [failureMessage, setFailureMessage] = useState<string | undefined>();
   const [flash, setFlash] = useState(false);
   const [samplesOpen, setSamplesOpen] = useState(false);
   const [chosen, setChosen] = useState<RetailerId | undefined>();
@@ -74,6 +76,7 @@ export function ScanPage() {
     lastRequest.current = req;
     const id = ++requestId.current;
     setResult(null);
+    setFailureMessage(undefined);
     setPhase("reading");
     api.scanImage(req.blob, req.sampleId).then(
       (res) => {
@@ -83,12 +86,14 @@ export function ScanPage() {
           setPhase("confirm");
         } else {
           setFailure(res.status === "no_price" ? "no_price" : "error");
+          setFailureMessage(res.status === "error" ? res.message : undefined);
           setPhase("failed");
         }
       },
-      () => {
+      (err: unknown) => {
         if (id !== requestId.current) return;
         setFailure("error");
+        setFailureMessage(err instanceof Error && err.name === "TimeoutError" ? TIMED_OUT : undefined);
         setPhase("failed");
       },
     );
@@ -218,7 +223,7 @@ export function ScanPage() {
         <FailurePanel
           dim
           mood={failure === "no_price" ? "meh" : "sad"}
-          message={failure === "no_price" ? NO_PRICE : READ_ERROR}
+          message={failure === "no_price" ? NO_PRICE : (failureMessage ?? READ_ERROR)}
           actions={failedActions}
         />
       )}

@@ -313,3 +313,77 @@ describe("postProcess: invented multi-buy", () => {
     expect(postProcess({ ...base, multiBuyText: "2 for $5.00" }, store).multiBuy).toEqual({ qty: 2, total: 5 });
   });
 });
+
+describe("scanWithGemini timeouts", () => {
+  const store = generateSeedStore();
+  const image = { data: Buffer.from("fake"), mimeType: "image/png" };
+  const K = (n: number) => `AQ.timeoutkey${n}_abcdefghijklmnopqrstuvw`;
+  const tag = JSON.stringify({ isPriceTag: true, productName: "Salted Butter", sizeText: "454 g", price: 5.99 });
+  const hang = () => new Promise<string>(() => {});
+  const fast = { sleep: async () => {}, attemptTimeoutMs: 30, totalTimeoutMs: 500 };
+
+  it("moves to the next key when one does not answer in time", async () => {
+    const used: string[] = [];
+    const r = await scanWithGemini(image, undefined, store, {
+      ...fast, pool: new KeyPool([K(1), K(2), K(3)]),
+      generate: async (key) => { used.push(key); return key === K(1) ? hang() : tag; },
+    });
+    expect(r.status).toBe("ok");
+    expect(used).toEqual([K(1), K(2)]);
+  });
+
+  it("cancels the request to the key that timed out", async () => {
+    let signal: AbortSignal | undefined;
+    await scanWithGemini(image, undefined, store, {
+      ...fast, pool: new KeyPool([K(1), K(2)]),
+      generate: async (key, _m, _i, s) => { if (key === K(1)) { signal = s; return hang(); } return tag; },
+    });
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it("says the scan timed out when every key is too slow", async () => {
+    let calls = 0;
+    const r = await scanWithGemini(image, undefined, store, {
+      ...fast, pool: new KeyPool([K(1), K(2)]), generate: () => { calls++; return hang(); },
+    });
+    expect(r.status).toBe("error");
+    expect(r.message).toMatch(/timed out/i);
+    expect(r.message).not.toMatch(/Couldn't read that photo/);
+    expect(calls).toBe(2);
+  });
+
+  it("stops at the overall limit instead of trying every key for ever", async () => {
+    let calls = 0;
+    const started = Date.now();
+    const r = await scanWithGemini(image, undefined, store, {
+      sleep: async () => {}, attemptTimeoutMs: 40, totalTimeoutMs: 100,
+      pool: new KeyPool([K(1), K(2), K(3), K(4), K(5), K(6)]), generate: () => { calls++; return hang(); },
+    });
+    expect(r.message).toMatch(/timed out/i);
+    expect(calls).toBeLessThan(6);
+    expect(Date.now() - started).toBeLessThan(400);
+  });
+
+  it("says Gemini is overloaded (not a generic error) after repeated 503s", async () => {
+    const r = await scanWithGemini(image, undefined, store, {
+      ...fast, pool: new KeyPool([K(1), K(2)]),
+      generate: async () => { throw new Error('{"error":{"code":503,"message":"high demand"}}'); },
+    });
+    expect(r.message).toMatch(/overloaded/i);
+  });
+
+  it("rotates past a timeout and a rate limit in the same scan", async () => {
+    const used: string[] = [];
+    const r = await scanWithGemini(image, undefined, store, {
+      ...fast, pool: new KeyPool([K(1), K(2), K(3)]),
+      generate: async (key) => {
+        used.push(key);
+        if (key === K(1)) return hang();
+        if (key === K(2)) throw new Error('{"error":{"code":429,"message":"Quota exceeded. Please retry in 30s."}}');
+        return tag;
+      },
+    });
+    expect(r.status).toBe("ok");
+    expect(used).toEqual([K(1), K(2), K(3)]);
+  });
+});

@@ -18,10 +18,20 @@ async function apiFetch<T>(path: string, init?: RequestInit, timeoutMs = 15_000)
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const res = await fetch(path, {
-      ...init,
-      signal: controller.signal,
-    });
+    let res: Response;
+    try {
+      res = await fetch(path, {
+        ...init,
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (controller.signal.aborted) {
+        const timeout = new Error("The server took too long to answer.");
+        timeout.name = "TimeoutError";
+        throw timeout;
+      }
+      throw err;
+    }
 
     const body = (await res.json().catch(() => ({}))) as { error?: string } & T;
 
@@ -75,7 +85,8 @@ export const liveApi: Api = {
         method: "POST",
         body: formData,
       },
-      25_000,
+      // above the server's own 40s scan limit (server/scan.ts), so its specific error reaches the screen first
+      45_000,
     );
   },
 

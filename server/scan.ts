@@ -260,7 +260,7 @@ export function postProcess(raw: RawGeminiExtraction, store: PriceStore): ScanRe
  * Reads a shelf tag image with Gemini Flash and returns a ScanResult matched to the catalogue.
  */
 /** One Gemini call with a specific key. Returns the model's JSON text. */
-export async function generateWithKey(apiKey: string, modelName: string, image: ScanImageInput): Promise<string | undefined> {
+export async function generateWithKey(apiKey: string, modelName: string, image: ScanImageInput, signal?: AbortSignal): Promise<string | undefined> {
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: modelName,
@@ -269,6 +269,7 @@ export async function generateWithKey(apiKey: string, modelName: string, image: 
       { text: PROMPT },
     ],
     config: {
+      abortSignal: signal,
       temperature: 0,
       // Reading printed text needs little deliberation; MINIMAL is rejected by this model, LOW is the lowest it accepts
       thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
@@ -281,13 +282,53 @@ export async function generateWithKey(apiKey: string, modelName: string, image: 
 
 export interface ScanDeps {
   /** replace the network call (tests) */
-  generate?: (apiKey: string, modelName: string, image: ScanImageInput) => Promise<string | undefined>;
+  generate?: (apiKey: string, modelName: string, image: ScanImageInput, signal?: AbortSignal) => Promise<string | undefined>;
   /** replace the shared key pool (tests) */
   pool?: KeyPool;
   sleep?: (ms: number) => Promise<void>;
+  /** how long one key gets to answer before the next key is tried (tests) */
+  attemptTimeoutMs?: number;
+  /** how long the whole scan may take across all keys (tests) */
+  totalTimeoutMs?: number;
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+// One slow key must not use up the whole scan: each key gets ATTEMPT_TIMEOUT_MS, then the next key is tried.
+// The browser waits CLIENT_TIMEOUT_MS (src/api/live.ts), which must stay above TOTAL_TIMEOUT_MS.
+const ATTEMPT_TIMEOUT_MS = 12_000;
+const TOTAL_TIMEOUT_MS = 40_000;
+const MIN_ATTEMPT_MS = 2_000;
+
+class AttemptTimeout extends Error {
+  constructor(ms: number) {
+    super(`Gemini did not answer within ${Math.round(ms / 1000)}s`);
+  }
+}
+
+/** Gemini was reached (or tried) but could not give an answer: every attempt timed out, or the model was overloaded. */
+class ScanFailed extends Error {
+  constructor(readonly kind: "timeout" | "unavailable") {
+    super(kind === "timeout" ? "Gemini timed out" : "Gemini is overloaded");
+  }
+}
+
+/** Runs `run` with an abort signal that fires after `ms`; rejects with AttemptTimeout and cancels the request. */
+async function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>, ms: number): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new AttemptTimeout(ms));
+    }, ms);
+  });
+  try {
+    return await Promise.race([run(controller.signal), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 class AllKeysBusy extends Error {
   constructor(readonly waitMs: number | null) {
@@ -297,7 +338,8 @@ class AllKeysBusy extends Error {
 
 /**
  * Runs the call on the next healthy key. A rate-limited key is benched (for Google's suggested wait) and the
- * request moves on to the next key at once; an invalid key is switched off; a 503 gets two short retries.
+ * request moves on to the next key at once; an invalid key is switched off; a key that does not answer in time,
+ * or a 503, moves on to the next key too (a 503 after a short pause, at most twice).
  */
 async function callWithRotation(
   pool: KeyPool,
@@ -305,15 +347,28 @@ async function callWithRotation(
   image: ScanImageInput,
   generate: NonNullable<ScanDeps["generate"]>,
   sleep: (ms: number) => Promise<void>,
+  attemptMs: number,
+  totalMs: number,
 ): Promise<string | undefined> {
+  const deadline = Date.now() + totalMs;
   let retries503 = 0;
+  let timeouts = 0;
+  let lastFailure: ScanFailed["kind"] | null = null;
   // at most one pass over every key, plus the 503 retries
   for (let attempt = 0; attempt < pool.size + 2; attempt++) {
+    const remaining = deadline - Date.now();
+    if (lastFailure && remaining < Math.min(MIN_ATTEMPT_MS, attemptMs)) break; // no time left for another real try
     const slot = pool.acquire();
-    if (!slot) throw new AllKeysBusy(pool.waitMs());
+    if (!slot) break;
     try {
-      return await generate(slot.key, modelName, image);
+      return await withTimeout((signal) => generate(slot.key, modelName, image, signal), Math.min(attemptMs, Math.max(remaining, 1)));
     } catch (err) {
+      if (err instanceof AttemptTimeout) {
+        lastFailure = "timeout";
+        if (++timeouts >= pool.size) break; // every key had its chance
+        console.warn(`[Gemini] key ${slot.label} did not answer in ${Math.round(attemptMs / 1000)}s; trying the next key`);
+        continue;
+      }
       const kind = classifyGeminiError(err);
       if (kind === "rate_limit") {
         const ms = cooldownMsFor(err);
@@ -326,14 +381,18 @@ async function callWithRotation(
         console.warn(`[Gemini] key ${slot.label} was rejected (invalid, expired or not allowed); switched off for this run`);
         continue;
       }
-      if (kind === "unavailable" && retries503 < 2) {
+      if (kind === "unavailable") {
+        lastFailure = "unavailable";
+        if (retries503 >= 2) break;
         retries503++;
+        console.warn(`[Gemini] key ${slot.label} got a 503 (high demand); trying the next key`);
         await sleep(retries503 * 1200); // Google's "high demand" spikes are short: 1.2s, then 2.4s
         continue;
       }
       throw err;
     }
   }
+  if (lastFailure) throw new ScanFailed(lastFailure);
   throw new AllKeysBusy(pool.waitMs());
 }
 
@@ -376,13 +435,10 @@ export async function scanWithGemini(
   const generate = deps.generate ?? generateWithKey;
   const sleep = deps.sleep ?? defaultSleep;
 
-  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error("Gemini scan timed out after 25s")), 25_000);
-    });
-
-    const responseText = await Promise.race([callWithRotation(pool, modelName, image, generate, sleep), timeoutPromise]);
+    const responseText = await callWithRotation(
+      pool, modelName, image, generate, sleep, deps.attemptTimeoutMs ?? ATTEMPT_TIMEOUT_MS, deps.totalTimeoutMs ?? TOTAL_TIMEOUT_MS,
+    );
     if (!responseText) {
       return {
         status: "error",
@@ -406,6 +462,17 @@ export async function scanWithGemini(
             : `Penny is getting a lot of scans right now. Try again in ${seconds <= 90 ? `${seconds} seconds` : "a few minutes"}, or pick a sample tag.`,
       };
     }
+    if (err instanceof ScanFailed) {
+      console.error(`[scanWithGemini] Gemini ${err.kind === "timeout" ? "timed out on every key tried" : "is overloaded"} (${JSON.stringify(pool.status())})`);
+      return {
+        status: "error",
+        candidates: [],
+        message:
+          err.kind === "timeout"
+            ? "The scan timed out: Gemini took too long to answer. Try again in a moment, or pick a sample tag."
+            : "Gemini is overloaded right now. Try again in a moment, or pick a sample tag.",
+      };
+    }
     // Log a short line (never a key or the whole error payload)
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error(`[scanWithGemini] Failed to process image: ${errMsg.slice(0, 160)}`);
@@ -414,7 +481,5 @@ export async function scanWithGemini(
       candidates: [],
       message: "Couldn't read that photo right now.",
     };
-  } finally {
-    clearTimeout(timer);
   }
 }
