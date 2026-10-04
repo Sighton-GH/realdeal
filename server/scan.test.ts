@@ -147,3 +147,23 @@ describe("scanWithGemini samples and errors", () => {
     }
   });
 });
+describe("postProcess: guards against mis-read 'was' prices", () => {
+  const store = generateSeedStore();
+  it("drops a 'was' price that is really the per-kg unit price line", () => {
+    const r = postProcess(
+      { isPriceTag: true, productName: "Plain Greek Yogurt", sizeText: "500 g", price: 5.97, wasPrice: 11.94, unitPriceText: "$11.94 / KG" },
+      store,
+    );
+    expect(r.status).toBe("ok");
+    expect(r.price).toBe(5.97);
+    expect(r.wasPrice).toBeUndefined();
+  });
+  it("drops a 'was' price that is not higher than the price", () => {
+    const r = postProcess({ isPriceTag: true, productName: "Salted Butter", sizeText: "454 g", price: 5.99, wasPrice: 5.99 }, store);
+    expect(r.wasPrice).toBeUndefined();
+  });
+  it("keeps a genuine struck-out 'was' price", () => {
+    const r = postProcess({ isPriceTag: true, productName: "Salted Butter", sizeText: "454 g", price: 5.99, wasPrice: 8.49, unitPriceText: "$13.19 / KG" }, store);
+    expect(r.wasPrice).toBe(8.49);
+  });
+});

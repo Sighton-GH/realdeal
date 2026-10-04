@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
 import { rankItems } from "../scrapers/match";
 import { parseMultiBuy, parsePrice, parseSize } from "../scrapers/parse";
 import type { PriceStore, RetailerId, ScanResult } from "../shared/types";
@@ -26,6 +26,8 @@ const PROMPT =
   "You are reading a grocery shelf tag or flyer photographed in a Canadian store. " +
   "Extract only what is printed. If several prices appear, price is what the shopper pays now for one unit; " +
   "a struck-out, 'was', or 'reg.' price goes in wasPrice; a multi-buy like '2 for $5' goes in multiBuyText. " +
+  "A per-weight or per-volume line such as '$11.94 / KG', '$1.29/lb' or '$0.99/100g' is NEVER price or wasPrice: put it in unitPriceText. " +
+  "Only set wasPrice when the tag clearly shows a struck-out, 'was' or 'reg.' price. " +
   "Use null for anything not visible. Do not guess.";
 
 const RESPONSE_SCHEMA = {
@@ -221,11 +223,18 @@ export function postProcess(raw: RawGeminiExtraction, store: PriceStore): ScanRe
     }
   }
 
+  // A "was" price must be higher than the price, and is not the per-kg/per-lb line the model sometimes mistakes it for
+  let wasPrice = raw.wasPrice != null ? raw.wasPrice : undefined;
+  const unitLine = parsePrice(raw.unitPriceText ?? "")?.price;
+  if (wasPrice !== undefined && (wasPrice <= price || (unitLine !== undefined && Math.abs(wasPrice - unitLine) < 0.005))) {
+    wasPrice = undefined;
+  }
+
   return {
     status: "ok",
     candidates,
     price,
-    wasPrice: raw.wasPrice != null ? raw.wasPrice : undefined,
+    wasPrice,
     multiBuy: multiBuy ?? undefined,
     retailerId: mapRetailer(raw.storeName),
     sizeQty,
@@ -266,17 +275,17 @@ export async function scanWithGemini(
     };
   }
 
-  const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const modelName = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 
   try {
     const ai = new GoogleGenAI({ apiKey });
 
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error("Gemini scan timed out after 15s")), 15_000);
+      timer = setTimeout(() => reject(new Error("Gemini scan timed out after 25s")), 25_000);
     });
 
-    const callPromise = ai.models.generateContent({
+    const request = () => ai.models.generateContent({
       model: modelName,
       contents: [
         {
@@ -291,9 +300,19 @@ export async function scanWithGemini(
       ],
       config: {
         temperature: 0,
+        // Reading printed text needs little deliberation; MINIMAL is rejected by this model, LOW is the lowest it accepts
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseMimeType: "application/json",
         responseSchema: RESPONSE_SCHEMA,
       },
+    });
+
+    // Google answers 503 "high demand" in short spikes: one quick retry covers most of them
+    const callPromise = request().catch(async (err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/\b503\b|UNAVAILABLE|high demand/i.test(msg)) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      return request();
     });
 
     const response = await Promise.race([callPromise, timeoutPromise]).finally(() => clearTimeout(timer));
@@ -309,13 +328,16 @@ export async function scanWithGemini(
     const raw = JSON.parse(responseText) as RawGeminiExtraction;
     return postProcess(raw, store);
   } catch (err) {
-    // Log server error safely without exposing keys
+    // Log a short line (never the key or the whole error payload)
     const errMsg = err instanceof Error ? err.message : String(err);
-    console.error("[scanWithGemini] Failed to process image:", errMsg);
+    const rateLimited = /\b429\b|RESOURCE_EXHAUSTED|quota/i.test(errMsg);
+    console.error(`[scanWithGemini] ${rateLimited ? "Rate limited by Gemini (free tier is about 5 requests a minute)" : "Failed to process image"}: ${errMsg.slice(0, 160)}`);
     return {
       status: "error",
       candidates: [],
-      message: "Couldn't read that photo right now.",
+      message: rateLimited
+        ? "Penny is getting a lot of scans right now. Try again in a minute, or pick a sample tag."
+        : "Couldn't read that photo right now.",
     };
   }
 }
